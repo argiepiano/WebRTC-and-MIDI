@@ -42,10 +42,15 @@
 	</div>
       </fieldset>
       <form class="form-inline" onSubmit="return sendMessage()" action="">
-	<input type="text" id="messageTextBox" placeholder="Type your message here">
-	<button type="submit" id="sendMessageBtn" class="btn">Send message</button>
+	<div class="form-group">
+	  <input type="text" class="form-control" id="messageTextBox" placeholder="Type your message here">
+	  <button type="submit" class="btn btn-default" id="sendMessageBtn" class="btn">Send message</button>	  
+	</div>
       </form>
-      <input type="file" id="fileBtn">
+      <div class="form-group">
+	<input type="file" id="fileBtn">
+      </div>
+
     </div>
     <div class="col-md-6">
       <fieldset class="well">
@@ -167,7 +172,7 @@
 	  <h3 id="myModalLabel">Create or join a room?</h3>
 	</div>
 	<div class="modal-footer">
-	  <button class="btn" id="joinBtn" data-dismiss="modal" aria-hidden="true">Join</button>
+	  <button class="btn btn-default" id="joinBtn" data-dismiss="modal" aria-hidden="true">Join</button>
 	  <button class="btn btn-primary" id="createBtn" data-dismiss="modal" aria-hidden="true">Create</button>
 	</div>	
       </div>
