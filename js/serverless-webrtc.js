@@ -8,14 +8,14 @@
 
 
   // Initialize Firebase
-  var config = {
+var config = {
     apiKey: "AIzaSyDW7EytZnIQCH_45G3e7UobA17XAyJ5HGE",
     authDomain: "webrtc-6c37f.firebaseapp.com",
     databaseURL: "https://webrtc-6c37f.firebaseio.com",
 //    storageBucket: "webrtc-6c37f.appspot.com",
     messagingSenderId: "779896271251"
-  };
-  firebase.initializeApp(config);
+};
+firebase.initializeApp(config);
 
 var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
   con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] }
