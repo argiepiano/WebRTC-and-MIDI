@@ -1,4 +1,4 @@
-# WebRTC-and-MIDI
+# WebRTC and MIDI
 "Serverless" webRTC (paste offer and answer) plus MIDI streaming
 
 This is a simple implementation based on [serverless-webrtc] (https://github.com/cjb/serverless-webrtc) with added MIDI streaming.
