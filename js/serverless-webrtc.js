@@ -7,21 +7,9 @@
 // version 6
 
 
-  // Initialize Firebase
-var config = {
-    apiKey: "AIzaSyDW7EytZnIQCH_45G3e7UobA17XAyJ5HGE",
-    authDomain: "webrtc-6c37f.firebaseapp.com",
-    databaseURL: "https://webrtc-6c37f.firebaseio.com",
-//    storageBucket: "webrtc-6c37f.appspot.com",
-    messagingSenderId: "779896271251"
-};
-firebase.initializeApp(config);
-
-var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
-  con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] }
-
-
+/* MIDI STUFF */
 // Initialize the MIDI system
+$("#main").hide();
 
 var midiInput, midiOutput, midi, midiInputConnectionState, midiOutputConnectionState;
 
@@ -79,7 +67,7 @@ function initMIDIInput() {
   if (midiInput) {
     midiInputConnectionState = midiInput.state;
     console.log("Selected input:", midiInput.name);
-    midiInput.onmidimessage = onMidiMessage;
+//     midiInput.onmidimessage = onMidiMessage;  // this listener should only be enabled after there is a connection
   } else {
      console.log("No MIDI input devices connected.");
   }
@@ -105,6 +93,7 @@ function initMIDIOutput() {
   }
 }
 
+// Handler for incoming midi messages
 function onMidiMessage(receivedEvent) {
   if ((receivedEvent.data[0] & 0xf0) != 0xF0) { // filter out SysEx messages, Active Sensing and other undesired messages.
     console.log("Sent midi: " + JSON.stringify(receivedEvent.data));
@@ -115,6 +104,64 @@ function onMidiMessage(receivedEvent) {
     });
   }
 }
+
+/* End of MIDI Stuff */
+
+
+/*  --------FIREBASE STUFF--------- */
+
+// Initialize Firebase
+var config = {
+    apiKey: "AIzaSyDW7EytZnIQCH_45G3e7UobA17XAyJ5HGE",
+    authDomain: "webrtc-6c37f.firebaseapp.com",
+    databaseURL: "https://webrtc-6c37f.firebaseio.com",
+//    storageBucket: "webrtc-6c37f.appspot.com",
+    messagingSenderId: "779896271251"
+};
+firebase.initializeApp(config);
+  
+// Listener to log out firebase user when closing window
+window.addEventListener("beforeunload", function() {
+  firebase.auth().signOut();
+});
+
+// Add listener to log in form.
+$('#login').on('submit',function(e) {
+  e.preventDefault();
+  var username=$("#username").val();
+  var passw = $("#password").val()
+  firebase.auth().signInWithEmailAndPassword(username, passw).catch(function(error) {
+    bootbox.alert("<strong>Error:</strong> "+error.message + " (Error code: " + error.code+")");
+  });
+});
+
+// Global firebase variables
+var pathToUser, currentUser
+  pathToOnline = 'online';
+  pathToSignaling = 'signaling';
+
+/* Detects log in */ 
+firebase.auth().onAuthStateChanged(function(user) {
+  if (user) {
+    $("#login").hide();
+    $("#main").show();
+    currentUser = user;
+    pathToUser = 'users/' + currentUser.uid;
+    var onlineUsersModel = new userHandlingModel();
+    var onlineUsersView = new userHandlingView(onlineUsersModel, $('#userlist'));
+    var onlineUsersController = new userHandlingController(onlineUsersModel, onlineUsersView);
+    
+  }
+}, function(error) { // handle errors 
+  console.log(error);
+});
+
+
+/* -------WEBRTC STUFF--------- */
+
+// WebRTC variables
+var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
+  con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
 
 /* THIS IS ALICE, THE CALLER/SENDER */
 
@@ -135,15 +182,15 @@ var sdpConstraints = {
   }
 }
 
-$('#showLocalOffer').modal('hide')
-$('#getRemoteAnswer').modal('hide')
-$('#waitForConnection').modal('hide')
-$('#createOrJoin').modal('show')
+//$('#showLocalOffer').modal('hide')
+//$('#getRemoteAnswer').modal('hide')
+//$('#waitForConnection').modal('hide')
+//$('#createOrJoin').modal('show')
 
-$('#createBtn').click(function () {
-  $('#showLocalOffer').modal('show')
-  createLocalOffer()
-})
+//$('#createBtn').click(function () {
+//  $('#showLocalOffer').modal('show')
+//  createLocalOffer()
+//})
 
 $('#joinBtn').click(function () {
   navigator.getUserMedia = navigator.getUserMedia ||
@@ -161,9 +208,9 @@ $('#joinBtn').click(function () {
   $('#getRemoteOffer').modal('show')
 })
 
-$('#offerSentBtn').click(function () {
-  $('#getRemoteAnswer').modal('show')
-})
+//$('#offerSentBtn').click(function () {
+//  $('#getRemoteAnswer').modal('show')
+//})
 
 $('#offerRecdBtn').click(function () {
   var offer = $('#remoteOffer').val()
@@ -185,30 +232,6 @@ $('#answerRecdBtn').click(function () {
   $('#waitForConnection').modal('show')
 })
 
-$('#fileBtn').change(function () {
-  var file = this.files[0]
-  console.log(file)
-
-  sendFile(file)
-})
-
-function fileSent (file) {
-  console.log(file + ' sent')
-}
-
-function fileProgress (file) {
-  console.log(file + ' progress')
-}
-
-function sendFile (data) {
-  if (data.size) {
-    FileSender.send({
-      file: data,
-      onFileSent: fileSent,
-      onFileProgress: fileProgress,
-    })
-  }
-}
 
 function sendMessage () {
   if ($('#messageTextBox').val()) {
@@ -226,7 +249,6 @@ function sendMessage () {
 
 function setupDC1 () {
   try {
-    var fileReceiver1 = new FileReceiver()
     dc1 = pc1.createDataChannel('test', {reliable: true})
     activedc = dc1
     console.log('Created datachannel (pc1)')
@@ -238,7 +260,7 @@ function setupDC1 () {
     dc1.onmessage = function (e) {
       console.log('Got message (pc1)', e.data)
       if (e.data.size) {
-        fileReceiver1.receive(e.data, {})
+
       } else {
         if (e.data.charCodeAt(0) == 2) {
           // The first message we get from Firefox (but not Chrome)
@@ -248,9 +270,7 @@ function setupDC1 () {
         }
         console.log(e)
         var data = JSON.parse(e.data)
-        if (data.type === 'file') {
-          fileReceiver1.receive(e.data, {})
-        } else if (data.type === 'message') {
+        if (data.type === 'message') {
           writeToChatLog(data.message, 'text-info')
           // Scroll chat text area to the bottom on new input.
           $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight)
@@ -353,7 +373,6 @@ var pc2 = new RTCPeerConnection(cfg, con),
 var pc2icedone = false
 
 pc2.ondatachannel = function (e) {
-  var fileReceiver2 = new FileReceiver()
   var datachannel = e.channel || e; // Chrome sends event, FF sends raw channel
   console.log('Received datachannel (pc2)', arguments)
   dc2 = datachannel
@@ -366,12 +385,10 @@ pc2.ondatachannel = function (e) {
   dc2.onmessage = function (e) {
     console.log('Got message (pc2)', e.data)
     if (e.data.size) {
-      fileReceiver2.receive(e.data, {})
+
     } else {
       var data = JSON.parse(e.data)
-      if (data.type === 'file') {
-        fileReceiver2.receive(e.data, {})
-      } else if (data.type === 'message') {
+      if (data.type === 'message') {
         writeToChatLog(data.message, 'text-info')
         // Scroll chat text area to the bottom on new input.
         $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight)
