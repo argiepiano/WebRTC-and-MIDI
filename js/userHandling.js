@@ -1,41 +1,16 @@
+// Contains functions related to creating the UI for the chatroom
+
 function userHandlingModel() {
   var _this = this;
-  this.onlineUsers = {}; // this is a property that contains object with the online user information to display in the online box
-  var onlineSnapshotObject = {};  // this contains the snapshot of the online node
-  var userKeyArray = [];
+  this.onlineUsers = {}; // contains the online user information to display in the online box
+
   this.onlineUserChange = new SpEvent(this);
   
-  var userHelper = function() {
-    var uid = userKeyArray.shift();
-    _this.onlineUsers[uid] = {};
-    switch (onlineSnapshotObject[uid].status) {
-      case 0:
-        _this.onlineUsers[uid].status = "Unavailable";
-        break;
-      case 1:
-        _this.onlineUsers[uid].status = "Available";
-        break;
-      case 2:
-        _this.onlineUsers[uid].status = "Invisible";
-        break;
-    }
-    firebase.database().ref('users/' + uid).once('value').then(function(snap){
-      var userData = snap.val();
-      _this.onlineUsers[uid].name = userData.name + ((currentUser.uid == uid) ? ' ME' : '' );
-      _this.onlineUsers[uid].nick = userData.nick;
-      if (userKeyArray.length) {
-        userHelper();
-      } else { // done iterating and building the user list
-        _this.onlineUserChange.notify();
-      }
-    });
-  }
+
   // Create a listener to users listed in the online node
   firebase.database().ref(pathToOnline).on('value', function(snapshot){
-    _this.onlineUsers = {};  // initialize
-    onlineSnapshotObject = snapshot.val();
-    userKeyArray = Object.keys(onlineSnapshotObject);
-    userHelper();
+    _this.onlineUsers = snapshot.val();
+    _this.onlineUserChange.notify();
   });
 }
 
@@ -43,18 +18,81 @@ function userHandlingView (model, target) {
   var _this = this;
   this.target = target;
   model.onlineUserChange.attach(function() {
+      var self = {}
+      self = model.onlineUsers[currentUser.uid];
+      self.myid = currentUser.uid;
+      var usersHTML = selfUserUI(self);
+      delete model.onlineUsers[currentUser.uid];
       var users = {users: model.onlineUsers};
-      var usersHTML = userListUI(users);
+      var usersHTML =  usersHTML + userListUI(users);
       _this.target.html(usersHTML);
   });
 }
 
 function userHandlingController (model, view) {
+  // Listener for status change (select element). Updates firebase status
+  view.target.on("change",".selfStatus", function(e) {
+    var update = {};
+    update[pathToOnline + "/" + e.target.id + "/status"] = e.target.value;
+    firebase.database().ref().update(update);
+  })
   
+  // DOM element link listener - "calling" someone - clicking on the nickname
+  view.target.on("click", ".userNick", function(e) {
+    if (model.onlineUsers[e.target.id].status == 1) {
+      bootbox.alert("Sending offer to " + e.target.innerHTML);
+      createLocalOffer(e.target.id);
+    } else {
+      bootbox.alert("User not available"); 
+    }
+  });
 }
 
+/* -------   TEMPLATES  ---------*/
+// Template for self in online user list
+var selfUserUI = Handlebars.compile(`
+  <div class="selfUser"><span class="nick">{{nick}}</span>
+    <select id={{myid}} class="selfStatus">
+      {{#select status}}
+        <option value="0">Unavailable</option>
+        <option value="1">Available</option>
+        <option value="2">Invisible</option>
+      {{/select}}
+    </select>
+  </div>
+`);
+
+// Template for online users
 var userListUI = Handlebars.compile(`
   {{#each users}}
-    <div id="{{@key}}"><span class="name">{{this.name}} ({{this.status}})</div>
+    <div class="onlineUser">
+      <a href="#" id={{@key}} class="userNick">{{this.nick}}</a>
+      <span class="status"> ({{#statusText this.status}}{{/statusText}})</span>
+    </div>
   {{/each}}
 `);
+
+
+// Helper to select the correct status option in Select element
+window.Handlebars.registerHelper('select', function( value, options ){
+    var $el = $('<select />').html( options.fn(this) );
+    $el.find('[value="' + value + '"]').attr({'selected':'selected'});
+    return $el.html();
+});
+
+// Helper to produce the correct status text
+window.Handlebars.registerHelper('statusText', function( value, options ){
+    var statusText;
+    switch (value) {
+      case 0:
+        statusText = 'Unavailable';
+        break;
+      case 1:
+        statusText = 'Available';
+        break;
+      case 2:
+        statusText = 'Invisible';
+        break;       
+    }
+    return new Handlebars.SafeString(statusText);
+});
