@@ -105,66 +105,6 @@ function UserAccountForm(target) {
   };
 }
 
-function UserInactivityAlert(target) {
-  this._target = target;
-  var t;
-  var _this = this;
-  var timeout = 300000; //5 minutes
-  var userConfirmModal =`
-    <div class="modal fade" id="user-confirm-alert" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-            <span class="sr-only">Close</span>
-          </button>
-          <h4 class="modal-title" id="myModalLabel">Hello? Are you still there?</h4>
-        </div>
-        <div class="modal-body">
-          <p>You have been inactive for some time.</p>
-          <p>Are you <span id="alert-username"></span>?</p>
-          <p>
-            <button type="button" id="alert-confirm" class="btn btn-primary">Yes, it's me</button>
-            <button type="button" id="alert-logout" class="btn btn-danger">No, that's not me!</button>
-          </p>
-        </div>
-      </div>
-    </div>
-  `
-  _this._target.append(userConfirmModal);
-  $("#user-confirm-alert").on("click", "#alert-confirm", function(e) {
-    $("#user-confirm-alert").modal('hide');
-  });
-  
-  $("#alert-logout").on("click", function (e) {
-    $("#user-confirm-alert").modal('hide');
-    _this.disable();
-    firebase.auth().signOut();
-  });
-  
-  this.enable = function() {
-    document.addEventListener("mousemove", resetTimer);
-  }
-  
-  this.show = function(){
-    firebase.database().ref(pathToUser).child('nick').once('value').then( function(snapshot) {
-      $("#alert-username").html(snapshot.val())
-      $("#user-confirm-alert").modal("show");
-    });
-  }
-  
-  this.disable = function() {
-    document.removeEventListener("mousemove", resetTimer);
-    clearTimeout(t);
-  }
-  
-  function resetTimer() {
-    clearTimeout(t);
-    t = setTimeout(_this.show, timeout);    
-  }
-}
-
 function SignUp() {
     var _this = this;
     var signUpForm = `

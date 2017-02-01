@@ -47,31 +47,27 @@ var config = {
 firebase.initializeApp(config);
 
 function logMeOut() {
-  //if (pc1.signalingState != 'closed') {
-  //  pc1.close();
-  //}
-  //if (pc2.signalingState != 'closed') {
-  //  pc2.close();
-  //}
-  //activedc && activedc.close();
-  
-  if (currentUser) {
-    if (!receiverUid) {
-      receiverUid = 'dummy';
+
+
+    if (currentUser) {
+      if (!receiverUid) {
+        receiverUid = 'dummy';
+      }
+      var update = {};
+      update[pathToSignaling + "/" + receiverUid]  = null;
+      // Delete any offer left over
+      firebase.database().ref().update(update)
+      .then(function() {
+       // Delete entry in the online status node
+        return  firebase.database().ref(pathToOnline + '/' + currentUser.uid).set(null);
+      })
+      .then (function() {
+      // Sign out
+      firebase.auth().signOut();
+      });
     }
-    var update = {};
-    update[pathToSignaling + "/" + receiverUid]  = null;
-    // Delete any offer left over
-    firebase.database().ref().update(update)
-    .then(function() {
-     // Delete entry in the online status node
-      return  firebase.database().ref(pathToOnline + '/' + currentUser.uid).set(null);
-    })
-    .then (function() {
-    // Sign out
-    firebase.auth().signOut();
-    });
-  }
+
+
 
   // Kill video streams and video elements.
   var localvideo = document.getElementById('localVideo');
@@ -85,13 +81,52 @@ function logMeOut() {
   }
   
   // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
-  negotiate = false;
-  pc1.getLocalStreams().forEach(function(stream){
-    pc1.removeStream(stream);
-  });
-  pc2.getLocalStreams().forEach(function(stream){
-    pc2.removeStream(stream);
-  });
+//  negotiate = false;
+//  pc.getLocalStreams().forEach(function(stream){
+//    pc.removeStream(stream);
+//  });
+//}
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+}
+
+function hangUp() {
+  
+
+
+    // First take care of offer and online status
+    if (currentUser) {
+      if (!receiverUid) {
+        receiverUid = 'dummy';
+      }
+      var update = {};
+      update[pathToSignaling + "/" + receiverUid]  = null;
+      // Delete any offer left over
+      firebase.database().ref().update(update)
+      .then(function() {
+       // set status to online
+        var update = {};
+        update[pathToOnline + "/" + currentUser.uid +"/status"] = 1;
+        firebase.database().ref().update(update);
+      })
+    }  
+
+
+  // Kill video streams and video elements.
+  var localvideo = document.getElementById('localVideo');
+  localvideo.srcObject = null;
+  var remotevideo = document.getElementById('remoteVideo');
+  remotevideo.srcObject = null;
+  if (localTracks) {
+    localTracks.forEach(function (track) {
+      track.stop();  
+    });
+  } 
+  pc.close();
+  pc = null;
+  
 }
 
 // Listener to log out firebase user when closing window
@@ -153,13 +188,13 @@ firebase.auth().onAuthStateChanged(function(user) {
     firebase.database().ref(pathToUser).once('value')
     .then (function (snapshot) {
       if (snapshot.val()) {
-	currentUserInfo = snapshot.val();
-	console.log("Current user (once) " + JSON.stringify(currentUserInfo));
-	// Set online status
-	return firebase.database().ref(pathToOnline + "/" + currentUser.uid).set({
-	  status: 1,
-	  nick: currentUserInfo.nick,
-	});
+	      currentUserInfo = snapshot.val();
+	      console.log("Current user (once) " + JSON.stringify(currentUserInfo));
+	       // Set online status
+	      return firebase.database().ref(pathToOnline + "/" + currentUser.uid).set({
+	        status: 1,
+	        nick: currentUserInfo.nick,
+	      });
       }
     })
     .catch (function(error) {

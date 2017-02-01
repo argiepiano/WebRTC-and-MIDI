@@ -23,7 +23,7 @@ function userHandlingView (model, target) {
       if (currentUser.uid) {
         var self = {}
         self = model.onlineUsers[currentUser.uid];
-        self.myid = currentUser.uid;
+        self['myid'] = currentUser.uid;
         var usersHTML = selfUserUI(self);
         delete model.onlineUsers[currentUser.uid];
         var users = {users: model.onlineUsers};
@@ -56,14 +56,8 @@ function userHandlingController (model, view) {
 /* -------   TEMPLATES  ---------*/
 // Template for self in online user list
 var selfUserUI = Handlebars.compile(`
-  <div class="selfUser"><span class="nick">{{nick}}</span>
-    <select id={{myid}} class="selfStatus">
-      {{#select status}}
-        <option value="0">Unavailable</option>
-        <option value="1">Available</option>
-        <option value="2">Invisible</option>
-      {{/select}}
-    </select>
+  <div class="selfUser"><span class="nick">{{nick}} - ME </span>
+  <span class="status"> ({{#statusText status}}{{/statusText}})</span>
   </div>
 `);
 
