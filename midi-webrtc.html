@@ -25,6 +25,38 @@
 
 </head>
 <body>
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <div class="navbar-header">
+				<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+				  <span class="icon-bar"></span>
+				  <span class="icon-bar"></span>
+				  <span class="icon-bar"></span>
+				</button>
+				<a href="#" class="navbar-brand"><strong>Video & MIDI Chat</strong></a>
+      </div>
+      <div class="collapse navbar-collapse" id="myNavbar">
+            <ul class="nav navbar-nav navbar-right">
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" id="midi-menu" data-toggle="dropdown">
+                        <strong>MIDI</strong>
+                        <span class="glyphicon glyphicon-chevron-down"></span>
+                    </a>
+                    <ul class="dropdown-menu">
+                      <li class="dropdown-header">MIDI In</li>
+                      <li><a href="#" id="midiin">Not connected</a></li>
+                      <li class="dropdown-header">MIDI Out</li>
+                      <li><a href="#" id="midiout">Not connected</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown" id="user-menu">
+                </li>
+                <li><a href="#" id="logoutbutton" onclick="logMeOut()">Log out</a></li>
+            </ul>
+      </div> <!--- myNavbar -->
+    </div> <!-- container-fluid -->
+  </nav>
+	
   <div class="container">
     
     <div id="login">
@@ -54,18 +86,18 @@
 
     <div id="main">
       <div class="row">
-	<div class="col-md-6">
+	<div class="col-sm-6">
 	  <Video id="localVideo">
 	</div>
-	<div class="col-md-6">
+	<div class="col-sm-6">
 	  <Video id="remoteVideo">
 	</div>
       </div>
       <div class="row">
-	<div class="col-md-6">
+	<div class="col-sm-4">
 	  <fieldset class="well">
 	    <p class="head muted">
-	      Serverless WebRTC version 7.
+	      Chat window (active only if connected to a peer).
 	    </p>
 	    <div class="text-info" id="chatlog" style="height:350px; overflow:auto;">
 	    </div>
@@ -81,7 +113,7 @@
 	  </div>-->
     
 	</div>
-	<div class="col-md-6">
+	<div class="col-sm-4">
 	  <fieldset class="well">
 	    <p class="head muted">
 	      Incoming MIDI log.
@@ -90,11 +122,11 @@
 	    </div>
 	  </fieldset>
 	</div>
-      </div>
+
       
       <!-- List of online users -->
-      <div class="row">
-	<div class="col-md-6">
+
+	<div class="col-sm-4">
 	  <fieldset class="well">
 	    <p class="head muted">
 	      Online users.
@@ -104,130 +136,21 @@
 	  </fieldset>
 	</div>
       </div>
-      
-      <!-- MIDI input and output -->
-      <div class="row">
-	<div class="form-group">
-	  <label for="midi-inputs">Midi inputs</label>
-	      <select id="midi-inputs" class="form-control"></select>
-	</div>
-	<div class="form-group">
-	  <label for="midi-outputs">Midi outputs</label>
-	  <select id="midi-outputs" class="form-control"></select>
-	</div>
-      </div>
     </div>
   </div>
 
-<!-- Modals -->
-  <div class="modal fade" id="showLocalOffer" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Send your local offer to someone else</h3>
-	</div>
-	<div class="modal-body">
-	  Here's your "offer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
-	<br/>
-	<textarea class="form-control" id="localOffer" name="localOffer" rows="10" cols="100"></textarea>
-	</div>
-	<div class="modal-footer">
-	  <button class="btn btn-primary" id="offerSentBtn" data-dismiss="modal" aria-hidden="true">Okay, I sent it.</button>
-	</div>	
-      </div>
-    </div>
-  </div>
-  
-  <div class="modal fade" id="showLocalAnswer" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Send your local answer to someone else</h3>
-	</div>
-	<div class="modal-body">
-	  Here's your "answer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
-	<br/>
-	<textarea class="form-control" id="localAnswer" name="localAnswer" rows="10" cols="100"></textarea>
-	</div>
-	<div class="modal-footer">
-	  <button class="btn btn-primary" id="answerSentBtn" data-dismiss="modal" aria-hidden="true">Okay, I sent it.</button>
-	</div>
-      </div>
-    </div>
-  </div>
 
   
-  <div class="modal fade" id="getRemoteOffer" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Paste the "offer" you received</h3>
-	</div>
-	<div class="modal-body">
-	  The person who created the room will send you an "offer" string -- paste it here.
-	<br/>
-	<textarea class="form-control" id="remoteOffer" name="remoteOffer" rows="10" cols="100"></textarea>
-	</div>
-	<div class="modal-footer">
-	  <button class="btn btn-primary" id="offerRecdBtn" data-dismiss="modal" aria-hidden="true">Okay, I pasted it.</button>
-	</div>	
-      </div>
-    </div>
-
-  </div>
+<!--- Modals   -->
   
-   <div class="modal fade" id="getRemoteAnswer" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Paste the "answer" you received</h3>
-	</div>
-	<div class="modal-body">
-	  Now paste in the "answer" that was sent back to you.
-	<br/>
-	<textarea class="form-control" id="remoteAnswer" name="remoteAnswer" rows="10" cols="100"></textarea>
-	</div>
-	<div class="modal-footer">
-	  <button class="btn btn-primary" id="answerRecdBtn" data-dismiss="modal" aria-hidden="true">Okay, I pasted it.</button>
-	</div>	
-      </div>
-    </div>
-  </div>
+  <div id="modals"></div>
 
-  
-  <div class="modal" id="waitForConnection" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Waiting for connection</h3>
-	</div>
-	<div class="modal-body">
-	  This dialog will disappear when a connection is made.
-	</div>
-	<div class="spinner" align="center">
-	  <img src="img/spinner.gif"></img>
-	</div>	
-      </div>
-    </div>
-  </div>
-  <div class="modal" id="createOrJoin" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-	<div class="modal-header">
-	  <h3 id="myModalLabel">Create or join a room?</h3>
-	</div>
-	<div class="modal-footer">
-	  <button class="btn btn-default" id="joinBtn" data-dismiss="modal" aria-hidden="true">Join</button>
-	  <button class="btn btn-primary" id="createBtn" data-dismiss="modal" aria-hidden="true">Create</button>
-	</div>	
-      </div>
-    </div>
-  </div>
 
-  
-  <script src="js/serverless-webrtc.js"></script>
+  <script src="js/MIDISystem.js"></script>
   <script src="js/userHandling.js"></script>
   <script src="js/SpEvent.js"></script>
   <script src="js/signaling-functions.js"></script>
+  <script src="js/User.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

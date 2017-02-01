@@ -1,109 +1,35 @@
-/* See also:
-    http://www.html5rocks.com/en/tutorials/webrtc/basics/
-    https://code.google.com/p/webrtc-samples/source/browse/trunk/apprtc/index.html
-
-    https://webrtc-demos.appspot.com/html/pc1.html
-*/
-// version 6
-
-
 /* MIDI STUFF */
 // Initialize the MIDI system
 $("#main").hide();
 
-var midiInput, midiOutput, midi, midiInputConnectionState, midiOutputConnectionState;
+var midisystem;
 
-//navigator.requestMIDIAccess()
-//  .then(
-//    onsuccesscallback,
-//    function onerrorcallback( err ) {
-//      console.log("uh-oh! Something went wrong!  Error code: " + err.code );
-//    }
-//  );
-//  
-//function onsuccesscallback(midiAccess) {
-//  if (midiAccess) {
-//    midi = midiAccess;
-//    midi.onstatechange = onMidiStateChange;
-//    initMIDIOutput();
-//    initMIDIInput();
-//    
-//  }
-//  else {alert("Something is very wrong")}
-//}
-//
-//function onMidiStateChange(event) {
-//  var port = event.port;
-//  console.log("Type: " +port.type);
-//  console.log("State: " + port.state);
-//  console.log("Connection: "+port.connection);
-//  if (port.type == "input") {   
-//    if (midiInputConnectionState != port.state)  {  // when midi listener is established, the statechange fires with the same state
-//      console.log("Re-init MIDI input");
-//      initMIDIInput();
-//    }
-//  }
-//  if (port.type == "output") {
-//    if (midiOutputConnectionState != port.state)  {
-//      console.log("Re-init MIDI output");
-//      initMIDIOutput();
-//    }
-//  }
-//}
-//
-//// Initialize input port
-//function initMIDIInput() {
-//  var midiInputIDs = [];
-//  $("#midi-inputs").empty();
-//  midi.inputs.forEach(function(port){
-//    console.log("Available input:", port.name);
-//    midiInputIDs.push(port.id);
-//    $("#midi-inputs").append($("<option />", {
-//        value: port.id,
-//        html: port.name
-//    }));
-//  });
-//  midiInput = midi.inputs.get(midiInputIDs[0]);
-//  if (midiInput) {
-//    midiInputConnectionState = midiInput.state;
-//    console.log("Selected input:", midiInput.name);
-////     midiInput.onmidimessage = onMidiMessage;  // this listener should only be enabled after there is a connection
-//  } else {
-//     console.log("No MIDI input devices connected.");
-//  }
-//}       
-//function initMIDIOutput() {
-//  midiOutputIDs = [];
-//  $("#midi-outputs").empty();
-// // get midiOutputs
-//  midi.outputs.forEach(function(port){
-//    console.log("Available output:", port.name);
-//    midiOutputIDs.push(port.id);
-//    $("#midi-outputs").append($("<option />", {
-//      value: port.id,
-//      html: port.name
-//    }));
-//  });
-//  midiOutput = midi.outputs.get(midiOutputIDs[0]);
-//  if (midiOutput) {
-//    midiOutputConnectionState = midiOutput.state;
-//    console.log("Selected output:", midiOutput.name);
-//  } else {
-//     console.log("No MIDI output devices connected.");
-//  }
-//}
-//
-//// Handler for incoming midi messages
-//function onMidiMessage(receivedEvent) {
-//  if ((receivedEvent.data[0] & 0xf0) != 0xF0) { // filter out SysEx messages, Active Sensing and other undesired messages.
-//    console.log("Sent midi: " + JSON.stringify(receivedEvent.data));
-//    var channel = new RTCMultiSession();
-//    channel.send({
-//      message: receivedEvent.data,
-//      type: "midi"
-//    });
-//  }
-//}
+// start midi system
+navigator.requestMIDIAccess && navigator.requestMIDIAccess().then(
+  function success(midiAccess) {                
+        // Initialize MIDI system
+        midisystem = new MidiSystem(midiAccess);
+        midisystem.init();
+        console.log("Input "+midisystem.selectedMidiInput.name);
+        console.log("Output "+midisystem.selectedMidiOutput.name);
+  },
+  function failure (err) {// Failed accessing MIDI
+        console.log("Error initializing MIDI!");
+        // @TODO Warn user that MIDI is not available. Stop app?
+  }
+); 
+
+// Handler for incoming midi messages
+function onMidiMessage(receivedEvent) {
+  if ((receivedEvent.data[0] & 0xF0) != 0xF0) { // filter out SysEx messages, Active Sensing and other undesired messages.
+    console.log("Sent midi: " + JSON.stringify(receivedEvent.data));
+    var channel = activedc;
+    channel.send(JSON.stringify({
+      message: receivedEvent.data,
+      type: "midi"
+    }));
+  }
+}
 
 /* End of MIDI Stuff */
 
@@ -122,7 +48,21 @@ firebase.initializeApp(config);
   
 // Listener to log out firebase user when closing window
 window.addEventListener("beforeunload", function() {
-  firebase.auth().signOut();
+  console.log("Before unload");
+  pc1.close();
+  pc2.close();
+  activedc.close();
+  $("#localVideo").attr('src', null);
+  $("#remoteVideo").attr('src', null);
+  if (!receiverUid) {
+    receiverUid = 'dummy';
+  }
+  var update = {};
+  update[pathToSignaling + "/" + receiverUid]  = null;
+  firebase.database().ref().update(update)
+  .then(function() {
+    firebase.auth().signOut();
+  });
 });
 
 // Add listener to log in form.
@@ -142,6 +82,7 @@ var pathToUser, currentUser, currentUserInfo,
 
 /* Detects log in */ 
 firebase.auth().onAuthStateChanged(function(user) {
+  console.log('firebase state change: ' + user);
   if (user) {
     $("#login").hide();
     $("#main").show();
@@ -153,7 +94,10 @@ firebase.auth().onAuthStateChanged(function(user) {
     
     // Load user info database node into global variable
     firebase.database().ref(pathToUser).on('value', function (snapshot) {
-      currentUserInfo = snapshot.val();
+      if (snapshot.val()) {
+        currentUserInfo = snapshot.val();
+        console.log("Current user " + JSON.stringify(currentUserInfo));
+      }
     });
 
     // Create listener for offers from someone else

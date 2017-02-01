@@ -9,8 +9,10 @@ function userHandlingModel() {
 
   // Create a listener to users listed in the online node
   firebase.database().ref(pathToOnline).on('value', function(snapshot){
-    _this.onlineUsers = snapshot.val();
-    _this.onlineUserChange.notify();
+    if (snapshot.val()) {
+      _this.onlineUsers = snapshot.val();
+      _this.onlineUserChange.notify();
+    }
   });
 }
 
@@ -18,14 +20,17 @@ function userHandlingView (model, target) {
   var _this = this;
   this.target = target;
   model.onlineUserChange.attach(function() {
-      var self = {}
-      self = model.onlineUsers[currentUser.uid];
-      self.myid = currentUser.uid;
-      var usersHTML = selfUserUI(self);
-      delete model.onlineUsers[currentUser.uid];
-      var users = {users: model.onlineUsers};
-      var usersHTML =  usersHTML + userListUI(users);
-      _this.target.html(usersHTML);
+      if (currentUser.uid) {
+        var self = {}
+        self = model.onlineUsers[currentUser.uid];
+        self.myid = currentUser.uid;
+        var usersHTML = selfUserUI(self);
+        delete model.onlineUsers[currentUser.uid];
+        var users = {users: model.onlineUsers};
+        var usersHTML =  usersHTML + userListUI(users);
+        _this.target.html(usersHTML);
+      }
+
   });
 }
 
@@ -40,7 +45,7 @@ function userHandlingController (model, view) {
   // DOM element link listener - "calling" someone - clicking on the nickname
   view.target.on("click", ".userNick", function(e) {
     if (model.onlineUsers[e.target.id].status == 1) {
-      bootbox.alert("Sending offer to " + e.target.innerHTML);
+      bootbox.dialog({message: "Sending offer to " + e.target.innerHTML + ". This may take up to 1 minute!"});
       createLocalOffer(e.target.id);
     } else {
       bootbox.alert("User not available"); 

@@ -10,20 +10,21 @@ var cfg = {'iceServers': [{'urls': 'stun:23.21.150.121'}]},
 
 var pc1 = new RTCPeerConnection(cfg, con),
   dc1 = null, tn1 = null
+  
+var localTracks, localStream;
+var negotiate = true;
 
 // Since the same JS file contains code for both sides of the connection,
 // activedc tracks which of the two possible datachannel variables we're using.
 var activedc
 
-var pc1icedone = false
-
-var sdpConstraints = {
-  optional: [],
-  mandatory: {
-    OfferToReceiveAudio: true,
-    OfferToReceiveVideo: true
-  }
-}
+// var sdpConstraints = {
+//   optional: [],
+//   mandatory: {
+//     OfferToReceiveAudio: true,
+//     OfferToReceiveVideo: true
+//   }
+// }
 
 
 
@@ -33,26 +34,34 @@ var sdpConstraints = {
 function createLocalOffer (uid) {
   receiverUid = uid;
   console.log('video1')
-  navigator.getUserMedia = navigator.getUserMedia ||
-                           navigator.webkitGetUserMedia ||
-                           navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia
-  navigator.getUserMedia({video: true, audio: false}, function (stream) {
+  navigator.mediaDevices.getUserMedia({video: true, audio: true})
+  .then(function (stream) {
+    localTracks = stream.getTracks();
+    localStream = stream;
+    negotiate = true;
     var video = document.getElementById('localVideo')
-    video.src = window.URL.createObjectURL(stream)
+    video.srcObject = stream;
     video.play()
+    // Chrome does not yet support this: stream.getTracks().forEach(track => pc1.addTrack(track, stream));
     pc1.addStream(stream)
-    console.log(stream)
+    // console.log(stream)
     console.log('adding stream to pc1')
     setupDC1()
-    pc1.createOffer(function (desc) {
-      pc1.setLocalDescription(desc, function () {}, function () {})
-      console.log('created local offer', desc)
-    },
-    function () { console.warn("Couldn't create offer") },
-    sdpConstraints)
-  }, function (error) {
-    console.log('Error adding stream to pc1: ' + error)
+    return pc1.createOffer();
+  })
+  .then(function (desc) {
+      return pc1.setLocalDescription(desc);
+  })
+  .then (function (desc) {
+    console.log('created local offer', desc)
+
+    // Create a MIDI listener
+    midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
+    console.log('created midi listener for ' + midisystem.selectedMidiInput.name)
+
+  })
+  .catch(function (error) {
+    console.log('Error somewhere in chain: ' + error)
   })
 }
 
@@ -66,7 +75,7 @@ function setupDC1 () {
       console.log('data channel connect')
     }
     dc1.onmessage = function (e) {
-      console.log('Got message (pc1)', e.data)
+      console.log('Got message (pc1)', e.data);
       if (e.data.size) {
 
       } else {
@@ -77,7 +86,7 @@ function setupDC1 () {
           return
         }
         console.log(e)
-        var data = JSON.parse(e.data)
+        var data = JSON.parse(e.data);
         if (data.type === 'message') {
           writeToChatLog(data.message, 'text-info')
           // Scroll chat text area to the bottom on new input.
@@ -94,18 +103,7 @@ function setupDC1 () {
 
 // This gets triggered when the local offer is ready. It creates an entry in the signaling node 
 pc1.onicecandidate = function (e) {
-  var update = {};
   console.log('ICE candidate (pc1)', e);
-  if (e.candidate == null) {
-    var localDescript = pc1.localDescription;
-    localDescript['offerer'] = currentUserInfo.nick;
-    update[pathToSignaling + '/' + receiverUid] = {offer: localDescript} ; 
-    firebase.database().ref().update(update);
-    console.log(JSON.stringify(pc1.localDescription));
-    
-    // create a listener for an answer from Bob
-    firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('value', answerListener);
-  }
 }
 
 // Triggered when adding stream from Bob
@@ -144,18 +142,44 @@ function onicegatheringstatechange (state) {
   console.info('ice gathering state change:', state)
 }
 
+function onnegotiationneeded (state) {
+  if (negotiate) {
+    console.log("Negotiate is true");
+    var update = {};
+    var localDescript = pc1.localDescription;
+    localDescript['offerer'] = currentUserInfo.nick;
+    update[pathToSignaling + '/' + receiverUid] = {offer: {localdescription: pc1.localDescription, offerer: currentUserInfo.nick}} ; 
+    firebase.database().ref().update(update);
+    console.log(JSON.stringify(pc1.localDescription));
+    
+    // create a listener for an answer from Bob
+    firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('value', answerListener);
+  }
+  console.info('Negotiation needed:', state)
+}
+
 pc1.onsignalingstatechange = onsignalingstatechange
 pc1.oniceconnectionstatechange = oniceconnectionstatechange
 pc1.onicegatheringstatechange = onicegatheringstatechange
+pc1.onnegotiationneeded = onnegotiationneeded;
+
 
 // Gets triggered when Bob creates an answer. Triggered by firebase answer listener 
 function answerListener(snapshot) {
-  console.log(snapshot.val());
-  var answer = snapshot.val();
-  var answerDesc = new RTCSessionDescription(answer);
-  console.log('Received remote answer: ', answerDesc);
-  writeToChatLog('Received remote answer', 'text-success');
-  pc1.setRemoteDescription(answerDesc);
+  if (snapshot.val()) {
+    console.log("Answer received " + JSON.stringify(snapshot.val()));
+    bootbox.hideAll();
+    var answer = snapshot.val();
+    var answerDesc = new RTCSessionDescription(answer);
+    console.log('Received remote answer: ', answerDesc);
+    writeToChatLog('Received remote answer', 'text-success');
+    pc1.setRemoteDescription(answerDesc)
+    .then (function() {
+      console.log('Successfully added the remote description to pc1');
+      firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').off('value', answerListener);
+    })
+    .catch (function(error) {console.log("Problem setting the remote description for PC1 " + error)});
+  }
 }
 
 
@@ -178,7 +202,7 @@ var pc2 = new RTCPeerConnection(cfg, con),
 function offerReceived(snapshot) {
   var snap = snapshot.val();
   if (snapshot.val()) {
-    console.log('offer received! '+snapshot.val());
+    console.log('offer received! '+ JSON.stringify(snap));
     bootbox.confirm({
       message: "You just got a call from " + snap.offerer,
         buttons: {
@@ -194,8 +218,7 @@ function offerReceived(snapshot) {
       callback: function(result) {
         if (result) {
           console.log(snap);
-          delete snap.offer.offerer;
-          answerTheOffer(snap.offer);
+          answerTheOffer(snap.localdescription);
         } else {
           console.log("Call rejected");
           // enter a -1 for answer to the offer
@@ -209,30 +232,44 @@ function offerReceived(snapshot) {
 
 
 function answerTheOffer(offer) {
-  navigator.getUserMedia = navigator.getUserMedia ||
-                           navigator.webkitGetUserMedia ||
-                           navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia
-  navigator.getUserMedia({video: true, audio: false}, function (stream) {
+  var offerDesc = new RTCSessionDescription(offer);
+  pc2.setRemoteDescription(offerDesc).then(function() {
+    writeToChatLog('Received remote offer','text-success');
+    return navigator.mediaDevices.getUserMedia({video: true, audio: true});
+  })
+  .then(function (stream) {
+    localTracks = stream.getTracks();
+    localStream = stream;
     var video = document.getElementById('localVideo')
-    video.src = window.URL.createObjectURL(stream)
-    video.play()
-    pc2.addStream(stream)
-  }, function (error) {
-    console.log('Error adding stream to pc2: ' + error)
+    video.srcObject = stream;
+    video.play;
+    // Chrome does not yet support this: stream.getTracks().forEach(track => pc2.addTrack(track, stream));
+    pc2.addStream(stream);
+    return pc2.createAnswer();
+  })
+  .then (function(answerDesc) {
+    writeToChatLog('Created local answer', 'text-success')
+    console.log('Created local answer: ', answerDesc)
+    return pc2.setLocalDescription(answerDesc)
+  })
+  .then (function() {
+    update = {};
+    update[pathToSignaling + '/' + currentUser.uid + '/answer'] =  pc2.localDescription; 
+    firebase.database().ref().update(update);
+    console.log("Created node with answer " + JSON.stringify(pc2.localDescription))
+    
+    // Add MIDI listener
+    midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
+
+  })
+  .catch (function (error) {
+    console.log("Error in the answertheoffer chain " + error)
   });
-  var offerDesc = new RTCSessionDescription(offer)
-  console.log('Received remote offer', offerDesc)
-  writeToChatLog('Received remote offer', 'text-success')
-  handleOfferFromPC1(offerDesc)
 }
 
 // This is triggered when the answer is ready to go
 pc2.onicecandidate = function (e) {
-  var localDescript = pc2.localDescription;
-  update[pathToSignaling + '/' + currentUser.uid] = {answer: localDescript} ; 
-  firebase.database().ref().update(update);
-  console.log(JSON.stringify(pc2.localDescription));
+  console.log("old onicecandidate called");
 }
 
 pc2.ondatachannel = function (e) {
@@ -262,58 +299,18 @@ pc2.ondatachannel = function (e) {
   }
 }
 
-//$('#joinBtn').click(function () {
-
-//  $('#getRemoteOffer').modal('show')
-//})
-
-//$('#offerSentBtn').click(function () {
-//  $('#getRemoteAnswer').modal('show')
-//})
-
-//$('#offerRecdBtn').click(function () {
-//  var offer = $('#remoteOffer').val()
-//  var offerDesc = new RTCSessionDescription(JSON.parse(offer))
-//  console.log('Received remote offer', offerDesc)
-//  writeToChatLog('Received remote offer', 'text-success')
-//  handleOfferFromPC1(offerDesc)
-//  $('#showLocalAnswer').modal('show')
-//})
-//
-//$('#answerSentBtn').click(function () {
-//  $('#waitForConnection').modal('show')
-//})
-
-
-function handleOfferFromPC1 (offerDesc) {
-  pc2.setRemoteDescription(offerDesc)
-  pc2.createAnswer(function (answerDesc) {
-    writeToChatLog('Created local answer', 'text-success')
-    console.log('Created local answer: ', answerDesc)
-    pc2.setLocalDescription(answerDesc)
-  },
-  function () { console.warn("Couldn't create offer") },
-  sdpConstraints)
-}
-
-
 
 pc2.onsignalingstatechange = onsignalingstatechange
 pc2.oniceconnectionstatechange = oniceconnectionstatechange
 pc2.onicegatheringstatechange = onicegatheringstatechange
 
-//function handleCandidateFromPC1 (iceCandidate) {
-//  pc2.addIceCandidate(iceCandidate)
-//}
-
 pc2.onaddstream = handleOnaddstream
-// pc2.onconnection = handleOnconnection  DEPRECATED
 
 function sendMessage () {
   if ($('#messageTextBox').val()) {
-    var channel = new RTCMultiSession()
+    var channel = activedc;
     writeToChatLog($('#messageTextBox').val(), 'text-success')
-    channel.send({message: $('#messageTextBox').val(), type: 'message'})
+    channel.send(JSON.stringify({message: $('#messageTextBox').val(), type: 'message'}));
     $('#messageTextBox').val('')
 
     // Scroll chat text area to the bottom on new input.
