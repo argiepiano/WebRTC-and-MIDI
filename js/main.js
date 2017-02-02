@@ -46,9 +46,9 @@ var config = {
 };
 firebase.initializeApp(config);
 
+// Log out
+
 function logMeOut() {
-
-
     if (currentUser) {
       if (!receiverUid) {
         receiverUid = 'dummy';
@@ -67,29 +67,38 @@ function logMeOut() {
       });
     }
 
-
-
   // Kill video streams and video elements.
   var localvideo = document.getElementById('localVideo');
   localvideo.srcObject = null;
   var remotevideo = document.getElementById('remoteVideo');
   remotevideo.srcObject = null;
+  remotevideo.src = '';
   if (localTracks) {
     localTracks.forEach(function (track) {
       track.stop();  
     });
   }
-  
-  // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
-//  negotiate = false;
-//  pc.getLocalStreams().forEach(function(stream){
-//    pc.removeStream(stream);
-//  });
-//}
-  if (pc) {
-    pc.close();
-    pc = null;
+
+   // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
+  negotiate = false;
+  if (typeof pc1 != 'undefined' && pc1.getLocalStreams) {
+    pc1.getLocalStreams().forEach(function(stream){
+      pc1.removeStream(stream);
+    });
   }
+
+  if (typeof pc2 != 'undefined' && pc2.getLocalStreams) {
+    pc2.getLocalStreams().forEach(function(stream){
+      pc2.removeStream(stream);
+    });
+  }
+  
+  activedc && activedc.close();
+
+  //if (pc) {
+  //  pc.close();
+  //  pc = null;
+  //}
 }
 
 function hangUp() {
@@ -119,13 +128,27 @@ function hangUp() {
   localvideo.srcObject = null;
   var remotevideo = document.getElementById('remoteVideo');
   remotevideo.srcObject = null;
+  remotevideo.src = '';
   if (localTracks) {
     localTracks.forEach(function (track) {
       track.stop();  
     });
   } 
-  pc.close();
-  pc = null;
+   // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
+  negotiate = false;
+  if (typeof pc1 != 'undefined' && pc1.getLocalStreams) {
+    pc1.getLocalStreams().forEach(function(stream){
+      pc1.removeStream(stream);
+    });
+  }
+
+  if (typeof pc2 != 'undefined' && pc2.getLocalStreams) {
+    pc2.getLocalStreams().forEach(function(stream){
+      pc2.removeStream(stream);
+    });
+  }
+  
+  activedc && activedc.close();
   
 }
 
