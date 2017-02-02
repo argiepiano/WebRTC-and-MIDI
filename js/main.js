@@ -58,21 +58,22 @@ function logMeOut() {
       // Delete any offer left over
       firebase.database().ref().update(update)
       .then(function() {
-       // Delete entry in the online status node
+        // Delete entry in the online status node
         return  firebase.database().ref(pathToOnline + '/' + currentUser.uid).set(null);
       })
       .then (function() {
-      // Sign out
-      firebase.auth().signOut();
+        // Sign out
+        firebase.auth().signOut();
       });
     }
 
+  receiverUid = '';
   // Kill video streams and video elements.
   var localvideo = document.getElementById('localVideo');
   localvideo.srcObject = null;
   var remotevideo = document.getElementById('remoteVideo');
   remotevideo.srcObject = null;
-  remotevideo.src = '';
+
   if (localTracks) {
     localTracks.forEach(function (track) {
       track.stop();  
@@ -122,6 +123,7 @@ function hangUp() {
       })
     }  
 
+  receiverUid = '';
 
   // Kill video streams and video elements.
   var localvideo = document.getElementById('localVideo');

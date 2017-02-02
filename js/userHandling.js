@@ -20,7 +20,7 @@ function userHandlingView (model, target) {
   var _this = this;
   this.target = target;
   model.onlineUserChange.attach(function() {
-      if (currentUser.uid) {
+      if (model.onlineUsers[currentUser.uid]) {
         var self = {}
         self = model.onlineUsers[currentUser.uid];
         self['myid'] = currentUser.uid;

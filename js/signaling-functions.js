@@ -36,10 +36,17 @@ var activedc;
 function createLocalOffer (uid) {
   
   pc1 = new RTCPeerConnection(cfg, con);
-  pc1.onaddstream = handleOnaddstream;
+  pc1.ontrack = handleOnaddstream;
   pc1.onsignalingstatechange = onsignalingstatechange
-  pc1.oniceconnectionstatechange = oniceconnectionstatechange
-  pc1.onconnectionstatechange = handleOnConnectionStateChange;
+  pc1.oniceconnectionstatechange = function (e) {
+      if (pc1.iceConnectionState == 'disconnected') {
+      hangUp();
+    }  console.info('ice connection state change:', e)
+  }
+  pc1.onconnectionstatechange = function (e) {
+
+    console.info('connection state change:', e)
+  };
   pc1.onnegotiationneeded = onnegotiationneeded;
   pc1.onicecandidate = function (e) {
     console.log('ICE candidate (pc1)', e);
@@ -109,20 +116,12 @@ function setupDC1 () {
 
 // Triggered when adding stream from Bob
 function handleOnaddstream (e) {
-  console.log('Got remote stream', e.stream)
+  console.log('Got remote stream', e.streams)
   var remoteVideo = document.getElementById('remoteVideo')
-  remoteVideo.srcObject = e.stream;
-  remoteVideo.play();
+  remoteVideo.srcObject = e.streams[0];
+//  remoteVideo.play();
 }
 
-
-// Triggered when conenction state changes
-function handleOnConnectionStateChange(event) {
-  //if (pc.connectionState === 'closed') {  // peer probably hanged up on you!
-  //  hangUp();
-  //}
-  console.log('Connection state', pc1.connectionState)
-}
 
 function onsignalingstatechange (state) {
   console.info('signaling state change:', state)
@@ -142,6 +141,7 @@ function onicegatheringstatechange (state) {
 // This is triggered when we add a stream to pc1
 function onnegotiationneeded (state) {
   if (negotiate) {
+    console.info('Negotiation needed:', state)
     negotiate = false;
     pc1.createOffer()
     .then(function (desc) {
@@ -173,7 +173,7 @@ function onnegotiationneeded (state) {
   } else {
     console.log('no negotiation');
   }
-  console.info('Negotiation needed:', state)
+
 }
 
 
@@ -247,10 +247,17 @@ function offerReceived(snapshot) {
 
 function answerTheOffer(offer) {
   pc2 = new RTCPeerConnection(cfg, con);
-  pc2.onaddstream = handleOnaddstream;
+  pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange
-  pc2.oniceconnectionstatechange = oniceconnectionstatechange
-  pc2.onconnectionstatechange = handleOnConnectionStateChange;
+  pc2.oniceconnectionstatechange = function (e) {
+      if (pc2.iceConnectionState == 'disconnected') {
+      hangUp();
+    }  console.info('ice connection state change:', e)
+  }
+  pc2.onconnectionstatechange = function (e) {
+
+    console.info('connection state change:', e)
+  };
 //  pc.onnegotiationneeded = onnegotiationneeded;
   pc2.onicecandidate = function (e) {
     console.log('ICE candidate (pc1)', e);
@@ -289,8 +296,8 @@ function answerTheOffer(offer) {
   .then (function(answerDesc) {
     writeToChatLog('Created local answer', 'text-success')
     console.log('Created local answer: ', answerDesc)
-    return pc2.setLocalDescription(answerDesc)
     callStatus = 'connected';
+    return pc2.setLocalDescription(answerDesc);
   })
   .then (function() {
     // Log in my answer to firebase
