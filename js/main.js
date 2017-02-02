@@ -13,7 +13,7 @@ navigator.requestMIDIAccess && navigator.requestMIDIAccess().then(
 	console.log("Input "+midisystem.selectedMidiInput.name);
 	console.log("Output "+midisystem.selectedMidiOutput.name);
   },
-  function failure (err) {// Failed accessing MIDI
+  function failure () {// Failed accessing MIDI
 	console.log("Error initializing MIDI!");
 	// @TODO Warn user that MIDI is not available. Stop app?
   }
@@ -49,23 +49,36 @@ firebase.initializeApp(config);
 // Log out
 
 function logMeOut() {
-    if (currentUser) {
-      if (!receiverUid) {
-        receiverUid = 'dummy';
-      }
-      var update = {};
-      update[pathToSignaling + "/" + receiverUid]  = null;
-      // Delete any offer left over
-      firebase.database().ref().update(update)
-      .then(function() {
-        // Delete entry in the online status node
-        return  firebase.database().ref(pathToOnline + '/' + currentUser.uid).set(null);
-      })
-      .then (function() {
-        // Sign out
-        firebase.auth().signOut();
-      });
+  if (currentUser) {
+    if (!receiverUid) {
+      receiverUid = 'dummy';
     }
+    // Delete all firebase listeners
+    firebase.database().ref(pathToSignaling+'/'+currentUser.uid + '/offer').off();
+    firebase.database().ref(pathToSignaling+'/'+receiverUid + '/answer').off();
+    firebase.database().ref(pathToSignaling+'/'+receiverUid+'/ice-to-offerer').off();
+    firebase.database().ref(pathToSignaling+ '/' + currentUser.uid + '/ice-to-answerer').off();
+    
+    var update = {};
+    update[pathToSignaling + "/" + receiverUid]  = null;
+    // Delete any offer left over
+    firebase.database().ref().update(update)
+    .then(function() {
+      // delete listener for self and users online
+      console.log('deleting listener for user');
+      firebase.database().ref(pathToUser).off();
+      firebase.database().ref(pathToOnline).off();
+      // delete online entry
+      var update = {};
+      update[pathToOnline + "/" + currentUser.uid] = null;
+      return firebase.database().ref().update(update);
+    })
+    .then(
+        function () {
+          firebase.auth().signOut();
+    })
+    .catch(function (e) {console.log('Error on logout process', e);});
+  }  
 
   receiverUid = '';
   // Kill video streams and video elements.
@@ -103,25 +116,27 @@ function logMeOut() {
 }
 
 function hangUp() {
-  
-
-
-    // First take care of offer and online status
-    if (currentUser) {
-      if (!receiverUid) {
-        receiverUid = 'dummy';
-      }
+  // First take care of offer and online status
+  if (currentUser) {
+    if (!receiverUid) {
+      receiverUid = 'dummy';
+    }
+    // Delete all firebase listeners
+    firebase.database().ref(pathToSignaling+'/'+receiverUid + '/answer').off();
+    firebase.database().ref(pathToSignaling+'/'+receiverUid+'/ice-to-offerer').off();
+    firebase.database().ref(pathToSignaling+ '/' + currentUser.uid + '/ice-to-answerer').off();
+    
+    var update = {};
+    update[pathToSignaling + "/" + receiverUid]  = null;
+    // Delete any offer left over
+    firebase.database().ref().update(update)
+    .then(function() {
+     // set status to online
       var update = {};
-      update[pathToSignaling + "/" + receiverUid]  = null;
-      // Delete any offer left over
-      firebase.database().ref().update(update)
-      .then(function() {
-       // set status to online
-        var update = {};
-        update[pathToOnline + "/" + currentUser.uid +"/status"] = 1;
-        firebase.database().ref().update(update);
-      })
-    }  
+      update[pathToOnline + "/" + currentUser.uid +"/status"] = 1;
+      firebase.database().ref().update(update);
+    });
+  }  
 
   receiverUid = '';
 
@@ -164,7 +179,7 @@ window.addEventListener("beforeunload", function() {
 $('#login').on('submit',function(e) {
   e.preventDefault();
   var username=$("#username").val();
-  var passw = $("#password").val()
+  var passw = $("#password").val();
   firebase.auth().signInWithEmailAndPassword(username, passw).catch(function(error) {
     bootbox.alert("<strong>Error:</strong> "+error.message + " (Error code: " + error.code+")");
   });
@@ -229,8 +244,8 @@ firebase.auth().onAuthStateChanged(function(user) {
     // Create listener for modifications of user info database node  
     firebase.database().ref(pathToUser).on('value', function (snapshot) {
       if (snapshot.val()) {
-	currentUserInfo = snapshot.val();
-	console.log("Current user " + JSON.stringify(currentUserInfo));
+        currentUserInfo = snapshot.val();
+        console.log("Current user " + JSON.stringify(currentUserInfo));
       }
     });
 
@@ -258,22 +273,22 @@ firebase.auth().onAuthStateChanged(function(user) {
 
 
 function getTimestamp () {
-  var totalSec = new Date().getTime() / 1000
-  var hours = parseInt(totalSec / 3600) % 24
-  var minutes = parseInt(totalSec / 60) % 60
-  var seconds = parseInt(totalSec % 60)
+  var totalSec = new Date().getTime() / 1000;
+  var hours = parseInt(totalSec / 3600) % 24;
+  var minutes = parseInt(totalSec / 60) % 60;
+  var seconds = parseInt(totalSec % 60);
 
   var result = (hours < 10 ? '0' + hours : hours) + ':' +
     (minutes < 10 ? '0' + minutes : minutes) + ':' +
-    (seconds < 10 ? '0' + seconds : seconds)
+    (seconds < 10 ? '0' + seconds : seconds);
 
-  return result
+  return result;
 }
 
 function writeToChatLog (message, message_type) {
-  document.getElementById('chatlog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>'
+  document.getElementById('chatlog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>';
 }
 
 function writeToMIDILog (message, message_type) {
-  document.getElementById('midilog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>'
+  document.getElementById('midilog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>';
 }

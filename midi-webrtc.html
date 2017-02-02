@@ -103,7 +103,7 @@
 						<div class="text-info" id="chatlog" style="height:250px; overflow:auto;">
 						</div>
 					</fieldset>
-					<form class="form-inline" onSubmit="return sendMessage()" action="">
+					<form class="form-inline" onSubmit="sendMessage();return false;" action="">
 						<div class="form-group">
 							<input type="text" class="form-control" id="messageTextBox" placeholder="Type your message here">
 							<button type="submit" class="btn btn-default" id="sendMessageBtn" class="btn">Send message</button>	  
