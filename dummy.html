@@ -1,0 +1,54 @@
+<!doctype html>
+<head>
+    <script src="js/adapter.js"></script>
+    <meta charset="utf-8">
+
+
+</head>
+
+<body>
+<p>My video</p>
+<p><video id="myvideo"></video></p>
+<p>End of my video</p>
+<button id="stop" onclick="stopVideo()">STOP</button>
+
+<script>
+
+var cfg = {'iceServers': [{'urls': 'stun:23.21.150.121'}]},
+  con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
+
+var pc1 = new RTCPeerConnection(cfg, con);
+
+var tracks, video;
+
+var button = document.getElementById('stop');
+
+navigator.mediaDevices.getUserMedia({video: true, audio: true})
+  .then(function (stream) {
+    video = document.getElementById('myvideo');
+    video.srcObject = stream;
+    video.play()
+    tracks = stream.getTracks()
+    // stream.getTracks().forEach(function (track) {
+    // 	pc1.addTrack(track, stream);
+    // 	console.log("in the process of adding " + track );
+
+    // });
+    pc1.addStream(stream);
+
+    console.log(stream.getTracks())
+
+  });
+
+  function stopVideo() {
+  	//tracks[1].stop();
+  	//tracks[0].stop();
+  	video.srcObject = null;
+  }
+
+pc1.onaddstream = function (error) {
+ console.log('Stream added: ' + error);
+}
+
+</script>
+</body>
