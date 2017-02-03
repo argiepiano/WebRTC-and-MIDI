@@ -56,6 +56,5 @@ function MidiSystem(midiAccess) {
     this.midiAccess.onstatechange = _this.MIDIStateChange;
     this.stateChange.notify();
   }
-
 }
 

@@ -3,8 +3,13 @@
 var receiverUid; // stores the uid of Alice, the party receiving the offer 
 
 // WebRTC variables
-var cfg = {'iceServers': [{'urls': 'stun:23.21.150.121'}]},
-  con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
+var cfg = {iceServers: [
+            {urls: 'stun:stun.l.google.com:19302'},
+            {urls: 'stun:stun1.l.google.com:19302'},
+            {urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
+              credential: 'webrtc',
+              username: 'webrtc'}
+          ]}
 
 /* THIS IS ALICE, THE CALLER/SENDER */
 
@@ -34,8 +39,8 @@ var activedc;
 
 // Creates a local offer to be sent via firebase to the receiver. uid is the id of the receiver. Called when you click the nickname in the chatroom
 function createLocalOffer (uid) {
-  
-  pc1 = new RTCPeerConnection(cfg, con);
+  receiverUid = uid;
+  pc1 = new RTCPeerConnection(cfg);
   pc1.ontrack = handleOnaddstream;
   pc1.onsignalingstatechange = onsignalingstatechange;
   pc1.oniceconnectionstatechange = function (e) {
@@ -58,15 +63,28 @@ function createLocalOffer (uid) {
     }
     // send ice candidate to answere
     console.log('The actual ice candidate is', e.candidate);
-    var iceRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-answerer').push();
-    iceRef.set(JSON.stringify(e.candidate));    
+    setTimeout(function() {
+      var iceRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-answerer').push();
+      iceRef.set(JSON.stringify(e.candidate));
+    },1000);
   };
+  
+    // Create a listener for an answer from Bob
+  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('value', answerListener);
+        
+  //// Create a MIDI listener
+  //midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
+  //midisystem.stateChange.attach(function () {
+  //  midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
+  //});
+  // console.log('created midi listener for ' + midisystem.selectedMidiInput.name)
+  
   // set up data channel for chat and midi
   setupDC1();
     
-  receiverUid = uid;
+
   console.log('video1');
-  navigator.mediaDevices.getUserMedia({video: {facingMode: 'user'}, audio: true})
+  navigator.mediaDevices.getUserMedia({video: { width: 800, height: 450 }, audio: false})
   .then(function (stream) {
     localTracks = stream.getTracks();
     localStream = stream;
@@ -81,7 +99,7 @@ function createLocalOffer (uid) {
     update[pathToOnline + "/" + currentUser.uid +"/status"] = 0;
     firebase.database().ref().update(update);
     
-    // Adding the stream will trigger a negotiationneeded event!
+    // Adding the stream will trigger a negotiationneeded event
     pc1.addStream(stream);
     // console.log(stream)
     console.log('adding stream to pc1');
@@ -91,34 +109,26 @@ function createLocalOffer (uid) {
 // Sets up a data stream to Bob
 function setupDC1 () {
   try {
-    dc1 = pc1.createDataChannel('test', {reliable: true});
+    dc1 = pc1.createDataChannel('test', {reliable: false});
     activedc = dc1;  // declared in another file
     console.log('Created datachannel (pc1)');
     dc1.onopen = function () {
       console.log('data channel connect');
     };
     dc1.onmessage = function (e) {
-      console.log('Got message (pc1)', e.data);
-      if (e.data.size) {
-
+      //console.log('Got message (pc1)', e.data);
+      // console.log(e);
+      var data = JSON.parse(e.data);
+      if (data.type === 'message') {
+        writeToChatLog(data.message, 'text-info');
+        // Scroll chat text area to the bottom on new input.
+        $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
       } else {
-        if (e.data.charCodeAt(0) == 2) {
-          // The first message we get from Firefox (but not Chrome)
-          // is literal ASCII 2 and I don't understand why -- if we
-          // leave it in, JSON.parse() will barf.
-          return;
-        }
-        console.log(e);
-        var data = JSON.parse(e.data);
-        if (data.type === 'message') {
-          writeToChatLog(data.message, 'text-info');
-          // Scroll chat text area to the bottom on new input.
-          $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
-        } else {
-          writeToMIDILog(JSON.stringify(data.message), 'text-info');
-          // Scroll MIDI log text area to the bottom on new input.
-          $('#midilog').scrollTop($('#midilog')[0].scrollHeight);
-        }
+        //writeToMIDILog(JSON.stringify(data.message), 'text-info');
+        //// Scroll MIDI log text area to the bottom on new input.
+        //$('#midilog').scrollTop($('#midilog')[0].scrollHeight);
+        // console.log('Received MIDI', data.message)
+        midisystem.selectedMidiOutput.send([data.message[0], data.message[1], data.message[2]]);
       }
     };
   } catch (e) { console.warn('No data channel (pc1)', e); }
@@ -155,7 +165,6 @@ function iceReceivedPc1(snapshot) {
 function onnegotiationneeded (state) {
   if (negotiate) {
     console.info('Negotiation needed:', state);
-    negotiate = false;
     pc1.createOffer()
     .then(function (desc) {
       return pc1.setLocalDescription(desc);
@@ -169,18 +178,10 @@ function onnegotiationneeded (state) {
       update[pathToSignaling + '/' + receiverUid] = {offer: {localdescription: pc1.localDescription, offerer: currentUserInfo.nick}} ; 
       firebase.database().ref().update(update);
       // console.log(JSON.stringify(pc1.localDescription));
-      
-      // Create a listener for an answer from Bob
-      firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('value', answerListener);
-            
-      // Create a MIDI listener
-      midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
-      // console.log('created midi listener for ' + midisystem.selectedMidiInput.name)
-      callStatus = 'connected';
     })
-      .catch(function (error) {
-        console.log('Error somewhere in chain: ' + error);
-      });
+    .catch(function (error) {
+      console.log('Error somewhere in chain: ' + error);
+    });
 
   } else {
     console.log('no negotiation');
@@ -191,6 +192,7 @@ function onnegotiationneeded (state) {
 
 // Gets triggered when Bob creates an answer. Triggered by firebase answer listener 
 function answerListener(snapshot) {
+  console.log('prelim answer', snapshot.val());
   if (snapshot.val()) {
     // console.log("Answer received " + JSON.stringify(snapshot.val()));
     bootbox.hideAll();
@@ -204,7 +206,6 @@ function answerListener(snapshot) {
         // Create a listener for ICE sent by pc2
         firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-offerer').on('child_added', iceReceivedPc1);
         console.log('Successfully added the remote description to pc1');
-        firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').off('value', answerListener);
       })
       .catch (function(error) {console.log("Problem setting the remote description for PC1 " + error);});
     } else {
@@ -225,56 +226,62 @@ function answerListener(snapshot) {
 var pc2,
   dc2 = null;
 
-// var pc2icedone = false
 
 // Handler for when someone creates an offer to you in the firebase database. Listener is defined right after log in
 function offerReceived(snapshot) {
-  var snap = snapshot.val();
   if (snapshot.val()) {
-    // console.log('offer received! '+ JSON.stringify(snap));
-    bootbox.confirm({
-      message: "You just got a call from " + snap.offerer,
-        buttons: {
-          confirm: {
-            label: 'Accept',
-            className: 'btn-success'
-          },
-          cancel: {
-            label: 'Reject',
-            className: 'btn-danger'
-          },
-        },
-      callback: function(result) {
-        if (result) {
-          // console.log(snap);
-          answerTheOffer(snap.localdescription);
-        } else {
-          console.log("Call rejected");
-          // enter a -1 for answer to the offer
-          var update ={answer: -1};
-          firebase.database().ref(pathToSignaling + "/" + currentUser.uid).update(update);
-        }
-      }
-    }); 
-  }  
+    var snap = snapshot.val();
+
+    callStatus = 'connected';
+    answerTheOffer(snap.localdescription);
+    
+      //bootbox.confirm({
+      //  message: "You just got a call from " + snap.offerer,
+      //    buttons: {
+      //      confirm: {
+      //        label: 'Accept',
+      //        className: 'btn-success'
+      //      },
+      //      cancel: {
+      //        label: 'Reject',
+      //        className: 'btn-danger'
+      //      },
+      //    },
+      //  callback: function(result) {
+      //    if (result) {
+      //      // console.log(snap);
+      //      answerTheOffer(snap.localdescription);
+      //    } else {
+      //      console.log("Call rejected");
+      //      // enter a -1 for answer to the offer
+      //      var update ={answer: -1};
+      //      firebase.database().ref(pathToSignaling + "/" + currentUser.uid).update(update);
+      //    }
+      //  }
+      //}); 
+
+    
+  }
 }
 
-
 function answerTheOffer(offer) {
-  pc2 = new RTCPeerConnection(cfg, con);
+  
+  pc2 = new RTCPeerConnection(cfg);
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
   pc2.oniceconnectionstatechange = function (e) {
-    if (pc2.iceConnectionState == 'disconnected') {
-      hangUp();
-    }
+    //if (pc2.iceConnectionState == 'disconnected') {
+    //  hangUp();
+    //}
     console.info('ice connection state change:', e);
   };
   pc2.onconnectionstatechange = function (e) {
-
+  
     console.info('connection state change:', e);
   };
-//  pc.onnegotiationneeded = onnegotiationneeded;
+  
+  pc2.ondatachannel = handleOnDataChannel; 
+  // var pc2icedone = false
 
   pc2.onicecandidate = function (e) {
     console.log('ICE candidate (pc2)', e);
@@ -283,18 +290,19 @@ function answerTheOffer(offer) {
       return;
     }
     // send ice candidate to offerer
-    var iceRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-offerer').push();
-    iceRef.set(JSON.stringify(e.candidate));    
+    setTimeout(function() {
+      var iceRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-offerer').push();
+      iceRef.set(JSON.stringify(e.candidate)); 
+    }, 1000);
+   
   };
-  
-  pc2.ondatachannel = handleOnDataChannel; 
   
   var offerDesc = new RTCSessionDescription(offer);
   
   pc2.setRemoteDescription(offerDesc)
   .then(function() {
     writeToChatLog('Received remote offer','text-success');
-    return navigator.mediaDevices.getUserMedia({video: {facingMode: 'user'}, audio: true});
+    return navigator.mediaDevices.getUserMedia({video: { width: 800, height: 450 }, audio: false});
   })
   .then(function (stream) {
     // Set online status to unavailable
@@ -334,9 +342,6 @@ function answerTheOffer(offer) {
     // Add listener for ICE candidates from pc1
     firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').on('child_added', iceReceivedPc2);
 
-    // Add MIDI listener
-    midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
-
   })
   .catch (function (error) {
     console.log("Error in the answer-the-offer chain", error);
@@ -359,21 +364,18 @@ function handleOnDataChannel (e) {
     console.log('data channel connect');
   };
   dc2.onmessage = function (e) {
-    console.log('Got message (pc2)', e.data);
-    if (e.data.size) {
-
+    // console.log('Got message (pc2)', e.data);
+    var data = JSON.parse(e.data);
+    if (data.type === 'message') {
+      writeToChatLog(data.message, 'text-info');
+      // Scroll chat text area to the bottom on new input.
+      $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
     } else {
-      var data = JSON.parse(e.data);
-      if (data.type === 'message') {
-        writeToChatLog(data.message, 'text-info');
-        // Scroll chat text area to the bottom on new input.
-        $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
-      } else {
-        writeToMIDILog(JSON.stringify(data.message), 'text-info');
-        // Scroll MIDI log text area to the bottom on new input.
-        $('#midilog').scrollTop($('#midilog')[0].scrollHeight);
-      }
-    }
+      //writeToMIDILog(JSON.stringify(data.message), 'text-info');
+      //$('#midilog').scrollTop($('#midilog')[0].scrollHeight);
+      // console.log("Received MIDI", data.message);
+      midisystem.selectedMidiOutput.send([data.message[0], data.message[1], data.message[2]]);
+    }    
   };
 }
 

@@ -9,9 +9,16 @@ navigator.requestMIDIAccess && navigator.requestMIDIAccess().then(
   function success(midiAccess) {                
 	// Initialize MIDI system
 	midisystem = new MidiSystem(midiAccess);
+  
+  // Create a MIDI listener
+  midisystem.stateChange.attach(function () {
+    console.log("created MIDI listener for", midisystem.selectedMidiInput.name);
+    midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
+  });
+  
 	midisystem.init();
-	console.log("Input "+midisystem.selectedMidiInput.name);
-	console.log("Output "+midisystem.selectedMidiOutput.name);
+	console.log("Input ", midisystem.selectedMidiInput.name);
+	console.log("Output ", midisystem.selectedMidiOutput.name);
   },
   function failure () {// Failed accessing MIDI
 	console.log("Error initializing MIDI!");
@@ -22,9 +29,8 @@ navigator.requestMIDIAccess && navigator.requestMIDIAccess().then(
 // Handler for incoming midi messages
 function onMidiMessage(receivedEvent) {
   if ((receivedEvent.data[0] & 0xF0) != 0xF0) { // filter out SysEx messages, Active Sensing and other undesired messages.
-    console.log("Sent midi: " + JSON.stringify(receivedEvent.data));
-    var channel = activedc;
-    channel.send(JSON.stringify({
+    // console.log("Sent midi: " + JSON.stringify(receivedEvent.data));
+    activedc.send(JSON.stringify({
       message: receivedEvent.data,
       type: "midi"
     }));
@@ -108,6 +114,9 @@ function logMeOut() {
   }
   
   activedc && activedc.close();
+  
+  //pc1 && pc1.close();
+  //pc2 && pc2.close();
 
   //if (pc) {
   //  pc.close();
@@ -166,6 +175,7 @@ function hangUp() {
   }
   
   activedc && activedc.close();
+
   
 }
 
@@ -289,6 +299,6 @@ function writeToChatLog (message, message_type) {
   document.getElementById('chatlog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>';
 }
 
-function writeToMIDILog (message, message_type) {
-  document.getElementById('midilog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>';
-}
+//function writeToMIDILog (message, message_type) {
+//  document.getElementById('midilog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>';
+//}
