@@ -40,7 +40,7 @@ var activedc;
 // Creates a local offer to be sent via firebase to the receiver. uid is the id of the receiver. Called when you click the nickname in the chatroom
 function createLocalOffer (uid) {
   receiverUid = uid;
-  pc1 = new RTCPeerConnection(cfg);
+  pc1 = new RTCPeerConnection();
   pc1.ontrack = handleOnaddstream;
   pc1.onsignalingstatechange = onsignalingstatechange;
   pc1.oniceconnectionstatechange = function (e) {
@@ -266,7 +266,7 @@ function offerReceived(snapshot) {
 
 function answerTheOffer(offer) {
   
-  pc2 = new RTCPeerConnection(cfg);
+  pc2 = new RTCPeerConnection();
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
   pc2.oniceconnectionstatechange = function (e) {
