@@ -52,6 +52,7 @@ var config = {
 };
 firebase.initializeApp(config);
 
+// -----------------------------------
 // Log out
 
 function logMeOut() {
@@ -115,15 +116,13 @@ function logMeOut() {
   
   activedc && activedc.close();
   
-  //pc1 && pc1.close();
-  //pc2 && pc2.close();
+  pc1 && pc1.close();
+  pc2 && pc2.close();
 
-  //if (pc) {
-  //  pc.close();
-  //  pc = null;
-  //}
 }
 
+// --------------------------------
+// Hang up
 function hangUp() {
   // First take care of offer and online status
   if (currentUser) {
@@ -141,6 +140,7 @@ function hangUp() {
     firebase.database().ref().update(update)
     .then(function() {
      // set status to online
+      myStatus = 1;
       var update = {};
       update[pathToOnline + "/" + currentUser.uid +"/status"] = 1;
       firebase.database().ref().update(update);
@@ -175,8 +175,7 @@ function hangUp() {
   }
   
   activedc && activedc.close();
-
-  
+ 
 }
 
 // Listener to log out firebase user when closing window
@@ -241,6 +240,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 	      currentUserInfo = snapshot.val();
 	      console.log("Current user (once) " + JSON.stringify(currentUserInfo));
 	       // Set online status
+         myStatus = 1; 
 	      return firebase.database().ref(pathToOnline + "/" + currentUser.uid).set({
 	        status: 1,
 	        nick: currentUserInfo.nick,
@@ -268,7 +268,8 @@ firebase.auth().onAuthStateChanged(function(user) {
 
 
     // Create listener for offers from someone else
-    firebase.database().ref(pathToSignaling + "/" + currentUser.uid + "/offer").on('value', offerReceived);
+    firebase.database().ref(pathToSignaling + "/" + currentUser.uid + "/offer").on('child_added', offerReceived);
+    
   } else {
     // User is logged out
 
