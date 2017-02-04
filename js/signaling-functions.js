@@ -161,7 +161,8 @@ function onnegotiationneeded (state) {
       console.log('created local offer', pc1.localDescription);
       // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
       var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
-      offerRef.set({localdescription: pc1.localDescription, offerer: currentUserInfo.nick})
+      descString = JSON.stringify(pc.localDescription);
+      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick})
     })
     .catch(function (error) {
       console.log('Error somewhere in chain: ' + error);
@@ -177,7 +178,7 @@ function answerListener(snapshot) {
   console.log('prelim answer', snapshot.val());
   if (snapshot.val()) {
     bootbox.hideAll();
-    var answer = snapshot.val();
+    var answer = JSON.parse(snapshot.val());
     if (answer != -1) { // The -1 was there when the answere had the option to reject. Not used anymore in this version
       var answerDesc = new RTCSessionDescription(answer);
       writeToChatLog('Received remote answer', 'text-success');
@@ -244,7 +245,7 @@ function offerReceived(snapshot) {
   }
 }
 
-function answerTheOffer(offer) {
+function answerTheOffer(offerString) {
 
   // Since this function is called twice (once when Alice creates a datachannel, and then when Alice adds a stream to her pc1),
   // we need to STOP the local camera stream if it already exists, since a new stream is created here for a second time.
@@ -287,7 +288,8 @@ function answerTheOffer(offer) {
    
   };
   
-  var offerDesc = new RTCSessionDescription(offer);
+  
+  var offerDesc = new RTCSessionDescription(JSON.parse(offerString));
   
   pc2.setRemoteDescription(offerDesc)
   .then(function() {
@@ -323,7 +325,7 @@ function answerTheOffer(offer) {
   .then (function() {
     // Add an answer to firebase
     var answerRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/answers').push();
-    answerRef.set(pc2.localDescription);
+    answerRef.set(JSON.stringify(pc2.localDescription));
     
     // Add listener for ICE candidates from pc1
     firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').on('child_added', iceReceivedPc2);
