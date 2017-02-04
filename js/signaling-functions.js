@@ -40,7 +40,7 @@ var activedc;
 // Creates a local offer to be sent via firebase to the receiver. uid is the id of the receiver. Called when you click the nickname in the chatroom
 function createLocalOffer (uid) {
   receiverUid = uid;
-  pc1 = new RTCPeerConnection();
+  pc1 = new RTCPeerConnection(cfg);
   pc1.ontrack = handleOnaddstream;
   pc1.onsignalingstatechange = onsignalingstatechange;
   pc1.oniceconnectionstatechange = function (e) {
@@ -71,20 +71,12 @@ function createLocalOffer (uid) {
   
     // Create a listener for an answer from Bob
   firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('value', answerListener);
-        
-  //// Create a MIDI listener
-  //midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
-  //midisystem.stateChange.attach(function () {
-  //  midisystem.selectedMidiInput.onmidimessage = onMidiMessage;
-  //});
-  // console.log('created midi listener for ' + midisystem.selectedMidiInput.name)
   
   // set up data channel for chat and midi
   setupDC1();
     
-
-  console.log('video1');
-  navigator.mediaDevices.getUserMedia({video: { width: 800, height: 450 }, audio: false})
+  // Get camera stream for offerer (local video)
+  navigator.mediaDevices.getUserMedia({video: { width: {exact: 640}, height: {exact: 480} }, audio: false})
   .then(function (stream) {
     localTracks = stream.getTracks();
     localStream = stream;
@@ -92,7 +84,6 @@ function createLocalOffer (uid) {
     var video = document.getElementById('localVideo');
     video.srcObject = stream;
     video.play();
-    // Chrome does not yet support  pc1.addTrack(track, stream));
   
     // Set online status to "unavailable"
     var update = {};
@@ -101,8 +92,6 @@ function createLocalOffer (uid) {
     
     // Adding the stream will trigger a negotiationneeded event
     pc1.addStream(stream);
-    // console.log(stream)
-    console.log('adding stream to pc1');
   });
 }
 
@@ -124,35 +113,25 @@ function setupDC1 () {
         // Scroll chat text area to the bottom on new input.
         $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
       } else {
-        //writeToMIDILog(JSON.stringify(data.message), 'text-info');
-        //// Scroll MIDI log text area to the bottom on new input.
-        //$('#midilog').scrollTop($('#midilog')[0].scrollHeight);
-        // console.log('Received MIDI', data.message)
         midisystem.selectedMidiOutput.send([data.message[0], data.message[1], data.message[2]]);
       }
     };
   } catch (e) { console.warn('No data channel (pc1)', e); }
 }
 
-// Triggered when adding stream from Bob
+// Triggered when adding stream from Bob 
 function handleOnaddstream (e) {
   console.log('Got remote stream', e.streams);
   var remoteVideo = document.getElementById('remoteVideo');
   remoteVideo.srcObject = e.streams[0];
-//  remoteVideo.play();
 }
-
 
 function onsignalingstatechange (state) {
   console.info('signaling state change:', state);
 }
 
 
-//function onicegatheringstatechange (state) {
-//  console.info('ice gathering state change:', state);
-//}
-
-// Triggered when we receive an ice candidate from pc2
+// Triggered when we receive an ice candidate from pc2 through Firebase
 function iceReceivedPc1(snapshot) {
   console.log('Adding ICE from pc2',snapshot.val());
   var can = new RTCIceCandidate(JSON.parse(snapshot.val()));
@@ -161,9 +140,9 @@ function iceReceivedPc1(snapshot) {
   
 }
 
-// This is triggered when we add a stream to pc1
+// This is triggered when we add (or remove) a stream to pc1 and also when setting the data channel
 function onnegotiationneeded (state) {
-  if (negotiate) {
+  if (negotiate) { // this semaphore is here to avoid sending an offer when hanging up
     console.info('Negotiation needed:', state);
     pc1.createOffer()
     .then(function (desc) {
@@ -173,43 +152,36 @@ function onnegotiationneeded (state) {
       console.log('created local offer', pc1.localDescription);
       // send local description to peer via firebase
       var update = {};
-//    var localDescript = pc1.localDescription;
-      // Send local description to PC2
       update[pathToSignaling + '/' + receiverUid] = {offer: {localdescription: pc1.localDescription, offerer: currentUserInfo.nick}} ; 
       firebase.database().ref().update(update);
-      // console.log(JSON.stringify(pc1.localDescription));
     })
     .catch(function (error) {
       console.log('Error somewhere in chain: ' + error);
     });
 
   } else {
-    console.log('no negotiation');
+    console.log('skip negotiation because we are hanging up');
   }
-
 }
-
 
 // Gets triggered when Bob creates an answer. Triggered by firebase answer listener 
 function answerListener(snapshot) {
   console.log('prelim answer', snapshot.val());
   if (snapshot.val()) {
-    // console.log("Answer received " + JSON.stringify(snapshot.val()));
     bootbox.hideAll();
     var answer = snapshot.val();
-    if (answer != -1) {
+    if (answer != -1) { // The -1 was there when the answere had the option to reject. Not used anymore in this version
       var answerDesc = new RTCSessionDescription(answer);
-      // console.log('Received remote answer: ', answerDesc);
       writeToChatLog('Received remote answer', 'text-success');
       pc1.setRemoteDescription(answerDesc)
       .then (function() {
-        // Create a listener for ICE sent by pc2
+        // Create a Firebase listener for ICE candidates sent by pc2
         firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-offerer').on('child_added', iceReceivedPc1);
         console.log('Successfully added the remote description to pc1');
       })
       .catch (function(error) {console.log("Problem setting the remote description for PC1 " + error);});
     } else {
-      // call rejected
+      // call rejected. This is not an option anymore. DELETE!
       firebase.database().ref(pathToSignaling+'/'+receiverUid+'/answer').off();
       var update = {};
       update.offer = null;
@@ -220,7 +192,7 @@ function answerListener(snapshot) {
 }
 
 
-/* ---------  BOB  ---------*/
+/* ---------  BOB, the answerer  ---------*/
 
 
 var pc2,
@@ -235,6 +207,7 @@ function offerReceived(snapshot) {
     callStatus = 'connected';
     answerTheOffer(snap.localdescription);
     
+      // Now we DON'T have the option to reject offer!!! DELETE
       //bootbox.confirm({
       //  message: "You just got a call from " + snap.offerer,
       //    buttons: {
@@ -265,23 +238,21 @@ function offerReceived(snapshot) {
 }
 
 function answerTheOffer(offer) {
-  
-  pc2 = new RTCPeerConnection();
+  pc2 = new RTCPeerConnection(cfg);
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
   pc2.oniceconnectionstatechange = function (e) {
+    // I have to check if the following lines work at all
     //if (pc2.iceConnectionState == 'disconnected') {
     //  hangUp();
     //}
-    console.info('ice connection state change:', e);
+   console.info('ice connection state change:', e);
   };
   pc2.onconnectionstatechange = function (e) {
-  
     console.info('connection state change:', e);
   };
   
   pc2.ondatachannel = handleOnDataChannel; 
-  // var pc2icedone = false
 
   pc2.onicecandidate = function (e) {
     console.log('ICE candidate (pc2)', e);
@@ -289,7 +260,7 @@ function answerTheOffer(offer) {
       console.log('returning cause not candidate',e);
       return;
     }
-    // send ice candidate to offerer
+    // send ice candidate to offerer through Firebase. TImeout seems to work well here to give time for initial connection to be established 
     setTimeout(function() {
       var iceRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-offerer').push();
       iceRef.set(JSON.stringify(e.candidate)); 
@@ -302,7 +273,7 @@ function answerTheOffer(offer) {
   pc2.setRemoteDescription(offerDesc)
   .then(function() {
     writeToChatLog('Received remote offer','text-success');
-    return navigator.mediaDevices.getUserMedia({video: { width: 800, height: 450 }, audio: false});
+    return navigator.mediaDevices.getUserMedia({video: { width: {exact: 640}, height: {exact: 480} }, audio: false});
   })
   .then(function (stream) {
     // Set online status to unavailable
@@ -310,15 +281,13 @@ function answerTheOffer(offer) {
     update[pathToOnline + "/" + currentUser.uid +"/status"] = 0;
     firebase.database().ref().update(update);
     
-    // Store tracks and stream to kill them when hanging up
+    // Store tracks and stream in globals to kill them when hanging up
     localTracks = stream.getTracks();
     localStream = stream;
     
     // Attach stream to video element 
     var video = document.getElementById('localVideo');
     video.srcObject = stream;
-    video.play();
-    // Chrome does not yet support pc2.addTrack(track, stream);
     
     // Add (local) stream to peer connection
     pc2.addStream(stream);
@@ -333,11 +302,10 @@ function answerTheOffer(offer) {
     return pc2.setLocalDescription(answerDesc);
   })
   .then (function() {
-    // Log in my answer to firebase
+    // Write my answer to firebase
     var update = {};
     update[pathToSignaling + '/' + currentUser.uid + '/answer'] =  pc2.localDescription; 
     firebase.database().ref().update(update);
-    console.log("Created node with answer " + JSON.stringify(pc2.localDescription));
     
     // Add listener for ICE candidates from pc1
     firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').on('child_added', iceReceivedPc2);
@@ -364,33 +332,23 @@ function handleOnDataChannel (e) {
     console.log('data channel connect');
   };
   dc2.onmessage = function (e) {
-    // console.log('Got message (pc2)', e.data);
     var data = JSON.parse(e.data);
     if (data.type === 'message') {
       writeToChatLog(data.message, 'text-info');
       // Scroll chat text area to the bottom on new input.
       $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight);
-    } else {
-      //writeToMIDILog(JSON.stringify(data.message), 'text-info');
-      //$('#midilog').scrollTop($('#midilog')[0].scrollHeight);
-      // console.log("Received MIDI", data.message);
+    } else { // we got a midi message!
       midisystem.selectedMidiOutput.send([data.message[0], data.message[1], data.message[2]]);
     }    
   };
 }
 
-//
-//pc2.onsignalingstatechange = onsignalingstatechange
-//pc2.oniceconnectionstatechange = oniceconnectionstatechange
-//pc2.onicegatheringstatechange = onicegatheringstatechange
-//
-//pc2.onaddstream = handleOnaddstream
+// Function used by both Alice and Bob to send text messages once the connection is established
 
 function sendMessage () {
   if ($('#messageTextBox').val()) {
-    var channel = activedc;
     writeToChatLog($('#messageTextBox').val(), 'text-success');
-    channel.send(JSON.stringify({message: $('#messageTextBox').val(), type: 'message'}));
+    activedc.send(JSON.stringify({message: $('#messageTextBox').val(), type: 'message'}));
     $('#messageTextBox').val('');
 
     // Scroll chat text area to the bottom on new input.
