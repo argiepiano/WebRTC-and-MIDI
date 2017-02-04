@@ -78,7 +78,7 @@ function createLocalOffer (uid) {
   };
   
     // Create a listener for an answer from Bob
-  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answer').on('child_added', answerListener);
+  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answers').on('child_added', answerListener);
   
   // set up data channel for chat and midi
   setupDC1();
@@ -160,7 +160,7 @@ function onnegotiationneeded (state) {
     .then (function () {
       console.log('created local offer', pc1.localDescription);
       // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
-      var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offer').push();
+      var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
       offerRef.set({offer: {localdescription: pc1.localDescription, offerer: currentUserInfo.nick}})
     })
     .catch(function (error) {
@@ -212,7 +212,7 @@ function offerReceived(snapshot) {
   if (snapshot.val()) {
     var snap = snapshot.val();
 
-    answerTheOffer(snap.localdescription);
+    answerTheOffer(snap.offer.localdescription);
     
       // Now we DON'T have the option to reject offer!!! DELETE
       //bootbox.confirm({
@@ -322,7 +322,7 @@ function answerTheOffer(offer) {
   })
   .then (function() {
     // Add an answer to firebase
-    var answerRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/answer').push();
+    var answerRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/answers').push();
     answerRef.set(pc2.localDescription);
     
     // Add listener for ICE candidates from pc1

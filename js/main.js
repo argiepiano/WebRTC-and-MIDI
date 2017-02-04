@@ -268,7 +268,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 
 
     // Create listener for offers from someone else
-    firebase.database().ref(pathToSignaling + "/" + currentUser.uid + "/offer").on('child_added', offerReceived);
+    firebase.database().ref(pathToSignaling + "/" + currentUser.uid + "/offers").on('child_added', offerReceived);
     
   } else {
     // User is logged out
