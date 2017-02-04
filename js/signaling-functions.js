@@ -161,7 +161,7 @@ function onnegotiationneeded (state) {
       console.log('created local offer', pc1.localDescription);
       // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
       var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
-      offerRef.set({offer: {localdescription: pc1.localDescription, offerer: currentUserInfo.nick}})
+      offerRef.set({localdescription: pc1.localDescription, offerer: currentUserInfo.nick})
     })
     .catch(function (error) {
       console.log('Error somewhere in chain: ' + error);
@@ -212,7 +212,7 @@ function offerReceived(snapshot) {
   if (snapshot.val()) {
     var snap = snapshot.val();
 
-    answerTheOffer(snap.offer.localdescription);
+    answerTheOffer(snap.localdescription);
     
       // Now we DON'T have the option to reject offer!!! DELETE
       //bootbox.confirm({
