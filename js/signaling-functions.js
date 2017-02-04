@@ -238,6 +238,18 @@ function offerReceived(snapshot) {
 }
 
 function answerTheOffer(offer) {
+  // Since this function is called twice (once when Alice creates a datachannel, and then when Alice adds a stream to pc1),
+  // we need to STOP the local camera stream if it already exists, since a new stream is created here for a second time.
+  // Otherwise we end up with the local camera existing
+  // twice in the DOM in a single variable, which makes it impossible to "kill" when hanging up
+  // Only ONE instance of the camera must exist
+  
+  if (localTracks) {
+    localTracks.forEach(function (track) {
+      track.stop();  
+    });
+  } 
+  
   pc2 = new RTCPeerConnection(cfg);
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
