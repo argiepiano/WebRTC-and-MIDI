@@ -1,6 +1,6 @@
 // Global variables
 
-var receiverUid; // stores the uid of Alice, the party receiving the offer 
+var receiverUid; // stores the uid of Bob, the party receiving the offer 
 
 // WebRTC variables
 var cfg = {iceServers: [
