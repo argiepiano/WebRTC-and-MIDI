@@ -116,8 +116,13 @@ function logMeOut() {
   
   activedc && activedc.close();
   
-  pc1 && pc1.close();
-  pc2 && pc2.close();
+  if (pc1 && pc1.signalingState != 'closed') {
+      pc1.close();
+  }
+
+   if (pc2 && pc2.signalingState != 'closed') {
+      pc2.close();
+  } 
 
 }
 
@@ -175,7 +180,13 @@ function hangUp() {
   }
   
   activedc && activedc.close();
- 
+  if (pc1 && pc1.signalingState != 'closed') {
+      pc1.close();
+  }
+
+   if (pc2 && pc2.signalingState != 'closed') {
+      pc2.close();
+  } 
 }
 
 // Listener to log out firebase user when closing window
