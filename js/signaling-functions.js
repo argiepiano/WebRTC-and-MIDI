@@ -52,10 +52,11 @@ function createLocalOffer (uid) {
   pc1.ontrack = handleOnaddstream;
   pc1.onsignalingstatechange = onsignalingstatechange;
   pc1.oniceconnectionstatechange = function (e) {
-      if (pc1.iceConnectionState == 'disconnected') {
+    console.log("Ice connection state change", e);
+    if (pc1.iceConnectionState == 'disconnected') {
       hangUp();
-  }
-  console.info('ice connection state change:', e);
+    }
+
   };
   pc1.onconnectionstatechange = function (e) {
 
@@ -161,8 +162,8 @@ function onnegotiationneeded (state) {
       console.log('created local offer', pc1.localDescription);
       // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
       var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
-      descString = JSON.stringify(pc.localDescription);
-      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick})
+      descString = JSON.stringify(pc1.localDescription);
+      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick});
     })
     .catch(function (error) {
       console.log('Error somewhere in chain: ' + error);
@@ -262,11 +263,12 @@ function answerTheOffer(offerString) {
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
   pc2.oniceconnectionstatechange = function (e) {
-    // I have to check if the following lines work at all
-    //if (pc2.iceConnectionState == 'disconnected') {
-    //  hangUp();
-    //}
-   console.info('ice connection state change:', e);
+
+    console.info('ice connection state change:', e);
+       // I have to check if the following lines work at all
+    if (pc2.iceConnectionState == 'disconnected') {
+      hangUp();
+    }
   };
   pc2.onconnectionstatechange = function (e) {
     console.info('connection state change:', e);
