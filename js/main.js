@@ -119,7 +119,6 @@ function logMeOut() {
   if (pc1 && pc1.signalingState != 'closed') {
       pc1.close();
   }
-
    if (pc2 && pc2.signalingState != 'closed') {
       pc2.close();
   } 
