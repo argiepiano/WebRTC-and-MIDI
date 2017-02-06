@@ -265,22 +265,23 @@ function answerTheOffer(offerString) {
     });
   } 
   
-  pc2 = new RTCPeerConnection(cfg);
-  pc2.ontrack = handleOnaddstream;
-  pc2.onsignalingstatechange = onsignalingstatechange;
-  pc2.oniceconnectionstatechange = function (e) {
-    console.info('ice connection state change:', e);
-       // I have to check if the following lines work at all
-    if (pc2.iceConnectionState == 'disconnected') {
-      hangUp();
-    }
-  };
-  pc2.onconnectionstatechange = function (e) {
-    console.info('connection state change:', e);
-  };
+  if (!pc2) {
+    pc2 = new RTCPeerConnection(cfg);
+    pc2.ontrack = handleOnaddstream;
+    pc2.onsignalingstatechange = onsignalingstatechange;
+    pc2.oniceconnectionstatechange = function (e) {
+      console.info('ice connection state change:', e);
+         // I have to check if the following lines work at all
+      if (pc2.iceConnectionState == 'disconnected') {
+        hangUp();
+      }
+    };
+    pc2.onconnectionstatechange = function (e) {
+      console.info('connection state change:', e);
+    };
+    pc2.ondatachannel = handleOnDataChannel; 
+  }
   
-  pc2.ondatachannel = handleOnDataChannel; 
-
   pc2.onicecandidate = function (e) {
     console.log('ICE candidate (pc2)', e);
     if (!e.candidate) {
