@@ -56,7 +56,7 @@ firebase.initializeApp(config);
 // Log out
 
 function logMeOut() {
-  if (currentUser) {
+  if (firebase.auth().currentUser) {
     if (!receiverUid) {
       receiverUid = 'dummy';
     }
