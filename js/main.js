@@ -102,13 +102,13 @@ function logMeOut() {
 
    // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
   negotiate = false;
-  if (typeof pc1 != 'undefined' && pc1.getLocalStreams) {
+  if (pc1 && pc1.getLocalStreams) {
     pc1.getLocalStreams().forEach(function(stream){
       pc1.removeStream(stream);
     });
   }
 
-  if (typeof pc2 != 'undefined' && pc2.getLocalStreams) {
+  if (pc2 && pc2.getLocalStreams) {
     pc2.getLocalStreams().forEach(function(stream){
       pc2.removeStream(stream);
     });
@@ -118,11 +118,12 @@ function logMeOut() {
   
   if (pc1 && pc1.signalingState != 'closed') {
       pc1.close();
+      setTimeout(function() {pc1 = null;}, 1000)
   }
    if (pc2 && pc2.signalingState != 'closed') {
       pc2.close();
+      setTimeout(function() {pc2 = null;}, 1000)
   } 
-
 }
 
 // --------------------------------
@@ -166,13 +167,13 @@ function hangUp() {
   } 
    // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
   negotiate = false;
-  if (typeof pc1 != 'undefined' && pc1.getLocalStreams) {
+  if (pc1 && pc1.getLocalStreams) {
     pc1.getLocalStreams().forEach(function(stream){
       pc1.removeStream(stream);
     });
   }
 
-  if (typeof pc2 != 'undefined' && pc2.getLocalStreams) {
+  if (pc2 && pc2.getLocalStreams) {
     pc2.getLocalStreams().forEach(function(stream){
       pc2.removeStream(stream);
     });
@@ -181,10 +182,11 @@ function hangUp() {
   activedc && activedc.close();
   if (pc1 && pc1.signalingState != 'closed') {
       pc1.close();
+      setTimeout(function() {pc1 = null;}, 1000)
   }
-
    if (pc2 && pc2.signalingState != 'closed') {
       pc2.close();
+      setTimeout(function() {pc2 = null;}, 1000)
   } 
 }
 

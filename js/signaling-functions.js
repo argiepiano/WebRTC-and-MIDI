@@ -13,7 +13,7 @@ var cfg = {iceServers: [
 
 /* THIS IS ALICE, THE CALLER/SENDER */
 
-var pc1 ,  dc1 = null;
+var pc1=null ,  dc1 = null;
 
 
 
@@ -85,7 +85,7 @@ function createLocalOffer (uid) {
   setupDC1();
     
   // Get camera stream for offerer (local video)
-  navigator.mediaDevices.getUserMedia({video: { width: {exact: 640}, height: {exact: 480} }, audio: false})
+  navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false})
   .then(function (stream) {
     localTracks = stream.getTracks();
     localStream = stream;
@@ -156,6 +156,8 @@ function onnegotiationneeded (state) {
     console.info('Negotiation needed:', state);
     pc1.createOffer()
     .then(function (desc) {
+       // Limit bandwidth
+      desc.sdp = updateBandwidthRestriction(desc.sdp, 250);
       return pc1.setLocalDescription(desc);
     })
     .then (function () {
@@ -181,8 +183,12 @@ function answerListener(snapshot) {
     bootbox.hideAll();
     var answer = JSON.parse(snapshot.val());
     if (answer != -1) { // The -1 was there when the answere had the option to reject. Not used anymore in this version
-      var answerDesc = new RTCSessionDescription(answer);
+      var answerDesc = answer;
       writeToChatLog('Received remote answer', 'text-success');
+
+      // Limit bandwidth
+      answerDesc.sdp = updateBandwidthRestriction(answerDesc.sdp, 250);
+      
       pc1.setRemoteDescription(answerDesc)
       .then (function() {
         // Create a Firebase listener for ICE candidates sent by pc2
@@ -205,7 +211,7 @@ function answerListener(snapshot) {
 /* ---------  BOB, the answerer  ---------*/
 
 
-var pc2,
+var pc2=null,
   dc2 = null;
 
 
@@ -263,7 +269,6 @@ function answerTheOffer(offerString) {
   pc2.ontrack = handleOnaddstream;
   pc2.onsignalingstatechange = onsignalingstatechange;
   pc2.oniceconnectionstatechange = function (e) {
-
     console.info('ice connection state change:', e);
        // I have to check if the following lines work at all
     if (pc2.iceConnectionState == 'disconnected') {
@@ -287,16 +292,16 @@ function answerTheOffer(offerString) {
       var iceRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-offerer').push();
       iceRef.set(JSON.stringify(e.candidate)); 
     }, 1000);
-   
-  };
+  };  
   
-  
-  var offerDesc = new RTCSessionDescription(JSON.parse(offerString));
+  var offerDesc = JSON.parse(offerString);
+  // Limit bandwidth
+  offerDesc.sdp = updateBandwidthRestriction(offerDesc.sdp, 250);
   
   pc2.setRemoteDescription(offerDesc)
   .then(function() {
     writeToChatLog('Received remote offer','text-success');
-    return navigator.mediaDevices.getUserMedia({video: { width: {exact: 640}, height: {exact: 480} }, audio: false});
+    return navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false});
   })
   .then(function (stream) {
     // Set online status to unavailable
@@ -322,6 +327,8 @@ function answerTheOffer(offerString) {
   .then (function(answerDesc) {
     writeToChatLog('Created local answer', 'text-success');
     console.log('Created local answer: ', answerDesc);
+    // Limit bandwidth
+    answerDesc.sdp = updateBandwidthRestriction(answerDesc.sdp, 250);
     return pc2.setLocalDescription(answerDesc);
   })
   .then (function() {
@@ -379,4 +386,15 @@ function sendMessage () {
   return false;
 }
 
+// Borrowed from https://github.com/webrtc/samples/tree/gh-pages/src/content/peerconnection/bandwidth
 
+function updateBandwidthRestriction(sdp, bandwidth) {
+  if (sdp.indexOf('b=AS:') === -1) {
+    // insert b=AS after c= line.
+    sdp = sdp.replace(/c=IN IP4 (.*)\r\n/,
+                      'c=IN IP4 $1\r\nb=AS:' + bandwidth + '\r\n');
+  } else {
+    sdp = sdp.replace(/b=AS:(.*)\r\n/, 'b=AS:' + bandwidth + '\r\n');
+  }
+  return sdp;
+}
