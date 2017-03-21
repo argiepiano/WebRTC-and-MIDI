@@ -103,16 +103,23 @@ function logMeOut() {
    // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
   negotiate = false;
   if (pc1 && pc1.getLocalStreams) {
-    pc1.getLocalStreams().forEach(function(stream){
-      pc1.removeStream(stream);
-    });
+    if (typeof pc1.removeTrack !== 'undefined') {
+      // Firefox already supports removeTrack. Chrome not yet
+      pc1.getSenders().forEach(sender => pc1.removeTrack(sender));
+    } else {
+      pc1.getLocalStreams().forEach(stream => pc1.removeStream(stream));
+    }
   }
 
   if (pc2 && pc2.getLocalStreams) {
-    pc2.getLocalStreams().forEach(function(stream){
-      pc2.removeStream(stream);
-    });
+    if (typeof pc2.removeTrack !== 'undefined') {
+      // Firefox already supports removeTrack. Chrome not yet
+      pc2.getSenders().forEach(sender => pc2.removeTrack(sender));
+    } else {
+      pc2.getLocalStreams().forEach(stream => pc2.removeStream(stream));
+    }
   }
+
   
   activedc && activedc.close();
   
@@ -167,16 +174,23 @@ function hangUp() {
   } 
    // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
   negotiate = false;
+  negotiate = false;
   if (pc1 && pc1.getLocalStreams) {
-    pc1.getLocalStreams().forEach(function(stream){
-      pc1.removeStream(stream);
-    });
+    if (typeof pc1.removeTrack !== 'undefined') {
+      // Firefox already supports removeTrack. Chrome not yet
+      pc1.getSenders().forEach(sender => pc1.removeTrack(sender));
+    } else {
+      pc1.getLocalStreams().forEach(stream => pc1.removeStream(stream));
+    }
   }
 
   if (pc2 && pc2.getLocalStreams) {
-    pc2.getLocalStreams().forEach(function(stream){
-      pc2.removeStream(stream);
-    });
+    if (typeof pc2.removeTrack !== 'undefined') {
+      // Firefox already supports removeTrack. Chrome not yet
+      pc2.getSenders().forEach(sender => pc2.removeTrack(sender));
+    } else {
+      pc2.getLocalStreams().forEach(stream => pc2.removeStream(stream));
+    }
   }
   
   activedc && activedc.close();

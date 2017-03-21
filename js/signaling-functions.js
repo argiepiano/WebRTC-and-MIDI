@@ -100,9 +100,13 @@ function createLocalOffer (uid) {
     update[pathToOnline + "/" + currentUser.uid +"/status"] = 0;
     firebase.database().ref().update(update);
     
-    // stream.getTracks().forEach(track => pc1.addTrack(track, stream));
-    // Adding the stream will trigger a negotiationneeded event
-    pc1.addStream(stream);
+    if (typeof pc1.addTrack !== 'undefined') {
+      // Firefox already supports addTrack. Chrome not yet
+        stream.getTracks().forEach(track => pc1.addTrack(track, stream));
+    } else {
+      // Adding the stream will trigger a negotiationneeded event
+      pc1.addStream(stream);
+    }
   });
 }
 
@@ -320,9 +324,13 @@ function answerTheOffer(offerString) {
     var video = document.getElementById('localVideo');
     video.srcObject = stream;
     
-    // stream.getTracks().forEach(track => pc2.addTrack(track, stream));
-    // Add (local) stream to peer connection
-    pc2.addStream(stream);
+    if (typeof pc2.addTrack !== 'undefined') {
+      // Firefox already supports addTrack. Chrome not yet
+        stream.getTracks().forEach(track => pc2.addTrack(track, stream));
+    } else {
+      // Adding the stream will trigger a negotiationneeded event
+      pc2.addStream(stream);
+    }
     
     // Create answer
     return pc2.createAnswer();
