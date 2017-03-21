@@ -81,9 +81,6 @@ function createLocalOffer (uid) {
     // Create a listener for an answer from Bob
   firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answers').on('child_added', answerListener);
   
-  // set up data channel for chat and midi
-  // setupDC1();
-    
   // Get camera stream for offerer (local video)
   navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false})
   .then(function (stream) {
@@ -170,7 +167,11 @@ function onnegotiationneeded (state) {
       // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
       var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
       descString = JSON.stringify(pc1.localDescription);
-      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick});
+      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick})
+      .then(function() {
+          // set up data channel for chat and midi
+          setupDC1();
+      });
     })
     .catch(function (error) {
       console.log('Error somewhere in chain: ' + error);
