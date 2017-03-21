@@ -170,6 +170,7 @@ function onnegotiationneeded (state) {
       offerRef.set({localdescription: descString, offerer: currentUserInfo.nick})
       .then(function() {
           // set up data channel for chat and midi
+          negotiate = false;
           setupDC1();
       });
     })
