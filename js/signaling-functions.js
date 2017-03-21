@@ -3,12 +3,12 @@
 var receiverUid; // stores the uid of Bob, the party receiving the offer. This global is ONLY used if you are Alice, the offerer 
 
 // WebRTC variables
-var cfg = {iceServers: [
-            {urls: 'stun:stun.l.google.com:19302'},
-            {urls: 'stun:stun1.l.google.com:19302'},
-            {urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
-              credential: 'webrtc',
-              username: 'webrtc'}
+var cfg = {"iceServers": [
+            {"urls": 'stun:stun.l.google.com:19302'},
+//            {urls: 'stun:stun1.l.google.com:19302'},
+            //{urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
+            //  credential: 'webrtc',
+            //  username: 'webrtc'}
           ]}
 
 /* THIS IS ALICE, THE CALLER/SENDER */
@@ -82,7 +82,7 @@ function createLocalOffer (uid) {
   firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answers').on('child_added', answerListener);
   
   // set up data channel for chat and midi
-  setupDC1();
+  // setupDC1();
     
   // Get camera stream for offerer (local video)
   navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false})
@@ -100,6 +100,7 @@ function createLocalOffer (uid) {
     update[pathToOnline + "/" + currentUser.uid +"/status"] = 0;
     firebase.database().ref().update(update);
     
+    // stream.getTracks().forEach(track => pc1.addTrack(track, stream));
     // Adding the stream will trigger a negotiationneeded event
     pc1.addStream(stream);
   });
@@ -319,6 +320,7 @@ function answerTheOffer(offerString) {
     var video = document.getElementById('localVideo');
     video.srcObject = stream;
     
+    // stream.getTracks().forEach(track => pc2.addTrack(track, stream));
     // Add (local) stream to peer connection
     pc2.addStream(stream);
     
