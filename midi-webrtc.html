@@ -90,7 +90,7 @@
 				</div>
 				<div class="col-sm-6">
 					<video id="localVideo" class="localVideo" width="200" autoplay muted controls></video><br />
-					<button type="button" id="hangUp" class="btn btn-sm btn-danger" onclick="hangUp()">Hang up</button>
+					<button type="button" id="hangUp" class="btn btn-sm btn-danger">Hang up</button>
 				</div>
       </div>
       <div class="row">
@@ -102,7 +102,7 @@
 						<div class="text-info" id="chatlog" style="height:250px; overflow:auto;">
 						</div>
 					</fieldset>
-					<form class="form-inline">
+					<form class="form-inline" onsubmit="return false;">
 						<div class="form-group">
 							<input type="text" class="form-control" id="messageTextBox" placeholder="Type your message here">
 							<button type="button" class="btn btn-default" id="sendMessageBtn" class="btn" onclick="sendMessage(); return false">Send message</button>	  

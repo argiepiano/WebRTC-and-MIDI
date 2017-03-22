@@ -11,15 +11,11 @@ var cfg = {"iceServers": [
             //  username: 'webrtc'}
           ]}
 
-/* THIS IS ALICE, THE CALLER/SENDER */
-
 var pc1=null ,  dc1 = null;
-
-
-
+          
+/* THIS IS ALICE, THE CALLER/SENDER */
 var localTracks, localStream;
-var negotiate = true;
-var myStatus = 1; // Available by default
+
 
 // Since the same JS file contains code for both sides of the connection,
 // activedc tracks which of the two possible datachannel variables we're using.
@@ -50,21 +46,18 @@ function createLocalOffer (uid) {
   receiverUid = uid;
   pc1 = new RTCPeerConnection(cfg);
   pc1.ontrack = handleOnaddstream;
-  pc1.onsignalingstatechange = onsignalingstatechange;
+  pc1.onsignalingstatechange = function(state) {console.log("PC1 signaling state change", pc1.signalingState)};
   pc1.oniceconnectionstatechange = function (e) {
-    console.log("Ice connection state change", e);
-    if (pc1.iceConnectionState == 'disconnected') {
-      hangUp();
-    }
+    console.log("Ice connection state change", e.target.iceConnectionState);
 
   };
   pc1.onconnectionstatechange = function (e) {
 
     console.info('connection state change:', e);
   };
-  pc1.onnegotiationneeded = onnegotiationneeded;
 
   pc1.onicecandidate = function (e) {
+        console.log("ICE gathering state: ", e.target.iceGatheringState);
     console.log('ICE candidate (pc1)', e);
     if (!e.candidate) {
       console.log('returning cause not candidate',e);
@@ -80,8 +73,18 @@ function createLocalOffer (uid) {
   
     // Create a listener for an answer from Bob
   firebase.database().ref(pathToSignaling + '/' + receiverUid + '/answers').on('child_added', answerListener);
+    // Create a Firebase listener for ICE candidates sent by pc2
+  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-offerer').on('child_added', iceReceivedPc1);
+  // Create a Firebase listener for status (we will use this mostly for hanging up)
+  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/connection-status').off();
+  firebase.database().ref(pathToSignaling + '/' + receiverUid + '/connection-status').on('value', connectionStatusListener);
   
+  // Set up data channel.
+  setupDC1();
+  
+
   // Get camera stream for offerer (local video)
+  console.log("About to get local user nedia");
   navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false})
   .then(function (stream) {
     localTracks = stream.getTracks();
@@ -100,15 +103,44 @@ function createLocalOffer (uid) {
     if (typeof pc1.addTrack !== 'undefined') {
       // Firefox already supports addTrack. Chrome not yet
         stream.getTracks().forEach(track => pc1.addTrack(track, stream));
+        console.log("added stream to pc1:", stream);
     } else {
       // Adding the stream will trigger a negotiationneeded event
       pc1.addStream(stream);
+      console.log("added stream to pc1:", stream);
     }
+    pc1.createOffer()
+    .then(function (desc) {
+       // Limit bandwidth
+       console.log("pc1 created offer with description", desc)
+      desc.sdp = updateBandwidthRestriction(desc.sdp, 250);
+      return pc1.setLocalDescription(desc);
+    })
+    .then (function () {
+      console.log('created local offer', pc1.localDescription);
+      // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
+      var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
+      descString = JSON.stringify(pc1.localDescription);
+      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick});
+      
+      // Update Firebase connection status
+      firebase.database().ref(pathToSignaling + '/' + receiverUid + '/connection-status').set('offer-sent');
+      
+      // Create event listener for hangup button for the offerer
+      $('#hangUp').on("click",function(){
+        $(this).off('click');
+        firebase.database().ref(pathToSignaling + '/' + receiverUid + '/connection-status').set('disconnected');
+      });
+    })
+    .catch(function (error) {
+      console.log('Error somewhere in chain: ' + error);
+    });
   });
 }
 
-// Sets up a data stream to Bob
+// Sets up a data channel to Bob
 function setupDC1 () {
+  console.log("About to set up data channel");
   try {
     dc1 = pc1.createDataChannel('test', {reliable: false});
     activedc = dc1;  // declared in another file
@@ -142,7 +174,6 @@ function onsignalingstatechange (state) {
   console.info('signaling state change:', state);
 }
 
-
 // Triggered when we receive an ice candidate from pc2 through Firebase
 function iceReceivedPc1(snapshot) {
   console.log('Adding ICE from pc2',snapshot.val());
@@ -150,37 +181,6 @@ function iceReceivedPc1(snapshot) {
   pc1.addIceCandidate(can)
   .catch(function(error) {console.log("error when adding ice pc1", error);});
   
-}
-
-// This is triggered when we add (or remove) a stream to pc1 and also when setting the data channel
-function onnegotiationneeded (state) {
-  if (negotiate) { // this semaphore is here to avoid sending an offer when hanging up
-    console.info('Negotiation needed:', state);
-    pc1.createOffer()
-    .then(function (desc) {
-       // Limit bandwidth
-      desc.sdp = updateBandwidthRestriction(desc.sdp, 250);
-      return pc1.setLocalDescription(desc);
-    })
-    .then (function () {
-      console.log('created local offer', pc1.localDescription);
-      // add the new offer to firebase. By pushing it, we actually keep previous offers (avoid overwriting old offers, in case they are not yet processed by Bob)
-      var offerRef = firebase.database().ref(pathToSignaling + '/' + receiverUid + '/offers').push();
-      descString = JSON.stringify(pc1.localDescription);
-      offerRef.set({localdescription: descString, offerer: currentUserInfo.nick})
-      .then(function() {
-          // set up data channel for chat and midi
-          negotiate = false;
-          setupDC1();
-      });
-    })
-    .catch(function (error) {
-      console.log('Error somewhere in chain: ' + error);
-    });
-
-  } else {
-    console.log('skip negotiation because we are hanging up');
-  }
 }
 
 // Gets triggered when Bob creates an answer. Triggered by firebase answer listener 
@@ -198,9 +198,11 @@ function answerListener(snapshot) {
       
       pc1.setRemoteDescription(answerDesc)
       .then (function() {
-        // Create a Firebase listener for ICE candidates sent by pc2
-        firebase.database().ref(pathToSignaling + '/' + receiverUid + '/ice-to-offerer').on('child_added', iceReceivedPc1);
         console.log('Successfully added the remote description to pc1');
+        
+        // Update Firebase connection status
+        firebase.database().ref(pathToSignaling + '/' + receiverUid + '/connection-status').set('connected');
+        
       })
       .catch (function(error) {console.log("Problem setting the remote description for PC1 " + error);});
     } else {
@@ -214,7 +216,17 @@ function answerListener(snapshot) {
   }
 }
 
+// Listens for connection status changes in the Firebase database. At this point used only for hanging up
+// This is used by both, Alice and Bob!
 
+function connectionStatusListener(snapshot) {
+  if (snapshot.val() == 'disconnected') {
+    // user or partner chose to terminate call
+    // kill hangup button listener (this is especially important if the other party terminated the call)
+    $("#hangUp").off('click');
+    hangUp();
+  }
+}
 /* ---------  BOB, the answerer  ---------*/
 
 
@@ -225,63 +237,56 @@ var pc2=null,
 // Handler for when someone creates an offer to you in the firebase database. Listener is defined right after log in
 function offerReceived(snapshot) {
   if (snapshot.val()) {
+  
     var snap = snapshot.val();
 
-    answerTheOffer(snap.localdescription);
+    // first thing: get the user local media!
     
-      // Now we DON'T have the option to reject offer!!! DELETE
-      //bootbox.confirm({
-      //  message: "You just got a call from " + snap.offerer,
-      //    buttons: {
-      //      confirm: {
-      //        label: 'Accept',
-      //        className: 'btn-success'
-      //      },
-      //      cancel: {
-      //        label: 'Reject',
-      //        className: 'btn-danger'
-      //      },
-      //    },
-      //  callback: function(result) {
-      //    if (result) {
-      //      // console.log(snap);
-      //      answerTheOffer(snap.localdescription);
-      //    } else {
-      //      console.log("Call rejected");
-      //      // enter a -1 for answer to the offer
-      //      var update ={answer: -1};
-      //      firebase.database().ref(pathToSignaling + "/" + currentUser.uid).update(update);
-      //    }
-      //  }
-      //}); 
-
+    if (localTracks) {
+      console.log("localtracks", localTracks);
+      console.log("stopping usermedia tracks previously acquired");  // we don't want to end up with two sets of local usermedia
+      localTracks.forEach(function (track) {
+        track.stop();  
+      });
+    }
+    console.log("About to get local user nedia");
     
+    // Get stream from user camera
+    navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false})
+    .then(function(stream) {
+      // Store tracks and stream in globals to kill them when hanging up
+      localTracks = stream.getTracks();
+      console.log('assigned localTracks variable', localTracks);
+      localStream = stream; // we store localStream to add it to the pc2 later...
+      
+       // Attach stream to video element 
+      var video = document.getElementById('localVideo');
+      video.srcObject = localStream;
+      
+      // Now we can safely proceed to answer the offer
+      answerTheOffer(snap.localdescription);
+    }); 
   }
 }
 
 function answerTheOffer(offerString) {
-
-  // Since this function is called twice (once when Alice creates a datachannel, and then when Alice adds a stream to her pc1),
-  // we need to STOP the local camera stream if it already exists, since a new stream is created here for a second time.
-  // Otherwise we end up with the 2 local streams for the local camera, which makes it impossible to "kill" when hanging up
-  // Only ONE stream of the camera must exist
   
-  if (localTracks) {
-    localTracks.forEach(function (track) {
-      track.stop();  
-    });
-  } 
+    // Stop ICE listeners in case they were added before (we don't want several listeners to the same thing)
+    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').off('child_added');
+    // Add listener for ICE candidates from pc1
+    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').on('child_added', iceReceivedPc2);
+    
+    // Stop and create a new listener for connection status. At this point this is used only for terminating the connection (hanging up)
+    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/connection-status').off('value');
+    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/connection-status').on('value', connectionStatusListener);
   
-  if (!pc2) {
+  if (!pc2) { // pc2 has not been created before...
     pc2 = new RTCPeerConnection(cfg);
     pc2.ontrack = handleOnaddstream;
-    pc2.onsignalingstatechange = onsignalingstatechange;
+    pc2.onsignalingstatechange = function(state) {console.log("PC2 signaling state change", pc2.signalingState)};
     pc2.oniceconnectionstatechange = function (e) {
-      console.info('ice connection state change:', e);
+      console.info('ice connection state change:', e.target.iceConnectionState);
          // I have to check if the following lines work at all
-      if (pc2.iceConnectionState == 'disconnected') {
-        hangUp();
-      }
     };
     pc2.onconnectionstatechange = function (e) {
       console.info('connection state change:', e);
@@ -289,7 +294,9 @@ function answerTheOffer(offerString) {
     pc2.ondatachannel = handleOnDataChannel; 
   }
   
+  // Listener to get my ICE candidates and send to offerer
   pc2.onicecandidate = function (e) {
+    console.log("ICE gathering state: ", e.target.iceGatheringState);
     console.log('ICE candidate (pc2)', e);
     if (!e.candidate) {
       console.log('returning cause not candidate',e);
@@ -301,7 +308,8 @@ function answerTheOffer(offerString) {
       iceRef.set(JSON.stringify(e.candidate)); 
     }, 1000);
   };  
-  
+
+  // ---------Start the process of creating an answer-----------------------
   var offerDesc = JSON.parse(offerString);
   // Limit bandwidth
   offerDesc.sdp = updateBandwidthRestriction(offerDesc.sdp, 250);
@@ -309,29 +317,21 @@ function answerTheOffer(offerString) {
   pc2.setRemoteDescription(offerDesc)
   .then(function() {
     writeToChatLog('Received remote offer','text-success');
-    return navigator.mediaDevices.getUserMedia({video: { width: {max: 320}, height: {max: 240} }, audio: false});
-  })
-  .then(function (stream) {
+    console.log("Just set up the PC2 remote description")
+
     // Set online status to unavailable
     myStatus = 0;
     var update = {};
     update[pathToOnline + "/" + currentUser.uid +"/status"] = 0;
     firebase.database().ref().update(update);
     
-    // Store tracks and stream in globals to kill them when hanging up
-    localTracks = stream.getTracks();
-    localStream = stream;
-    
-    // Attach stream to video element 
-    var video = document.getElementById('localVideo');
-    video.srcObject = stream;
-    
+    console.log("About to add stream to PC2. The length of local stream array", pc2.getLocalStreams().length)
     if (typeof pc2.addTrack !== 'undefined') {
       // Firefox already supports addTrack. Chrome not yet
-        stream.getTracks().forEach(track => pc2.addTrack(track, stream));
+        localStream.getTracks().forEach(track => pc2.addTrack(track, localStream));
     } else {
       // Adding the stream will trigger a negotiationneeded event
-      pc2.addStream(stream);
+      pc2.addStream(localStream);
     }
     
     // Create answer
@@ -346,12 +346,18 @@ function answerTheOffer(offerString) {
   })
   .then (function() {
     // Add an answer to firebase
+    console.log("About to add an answer to Firebase");
     var answerRef = firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/answers').push();
     answerRef.set(JSON.stringify(pc2.localDescription));
     
-    // Add listener for ICE candidates from pc1
-    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/ice-to-answerer').on('child_added', iceReceivedPc2);
-
+    // Update the Firebase status
+    firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/connection-status').set('answer-sent');
+    
+    // Create listener for hangup button
+    $('#hangUp').on("click", function() {
+      $(this).off("click");
+      firebase.database().ref(pathToSignaling + '/' + currentUser.uid + '/connection-status').set('disconnected');
+    });
   })
   .catch (function (error) {
     console.log("Error in the answer-the-offer chain", error);
@@ -367,7 +373,7 @@ function iceReceivedPc2(snapshot) {
 
 function handleOnDataChannel (e) {
   var datachannel = e.channel || e; // Chrome sends event, FF sends raw channel
-  console.log('Received datachannel (pc2)', arguments);
+  console.log('Received datachannel (pc2)', e);
   dc2 = datachannel;
   activedc = dc2;
   dc2.onopen = function () {
@@ -411,3 +417,5 @@ function updateBandwidthRestriction(sdp, bandwidth) {
   }
   return sdp;
 }
+
+

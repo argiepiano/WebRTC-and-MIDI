@@ -100,8 +100,7 @@ function logMeOut() {
     });
   }
 
-   // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
-  negotiate = false;
+
   if (pc1 && pc1.getLocalStreams) {
     if (typeof pc1.removeTrack !== 'undefined') {
       // Firefox already supports removeTrack. Chrome not yet
@@ -166,15 +165,13 @@ function hangUp() {
   localvideo.srcObject = null;
   var remotevideo = document.getElementById('remoteVideo');
   remotevideo.srcObject = null;
-  remotevideo.src = '';
+
   if (localTracks) {
     localTracks.forEach(function (track) {
       track.stop();  
     });
   } 
-   // Semaphore to disable negotiation when logging out (onnegotiationneeded is triggered when removing streams)
-  negotiate = false;
-  negotiate = false;
+
   if (pc1 && pc1.getLocalStreams) {
     if (typeof pc1.removeTrack !== 'undefined') {
       // Firefox already supports removeTrack. Chrome not yet
@@ -236,10 +233,13 @@ document.querySelector("#reset-password").addEventListener("click", function (e)
   passReset.render();          
 });
 
+
 // Global firebase variables
 var pathToUser, currentUser, currentUserInfo, 
   pathToOnline = 'online';
   pathToSignaling = 'signaling';
+  
+var myStatus = 1; // Available by default
 
 /* Detects log in */ 
 firebase.auth().onAuthStateChanged(function(user) {
