@@ -167,7 +167,7 @@ function setupDC1 () {
 function handleOnaddstream (e) {
   console.log('Got remote stream', e.streams);
   var remoteVideo = document.getElementById('remoteVideo');
-  remoteVideo.srcObject = e.streams[0];
+  remoteVideo.src = window.URL.createObjectURL(e.streams[0]);
   remoteVideo.play();
 }
 
