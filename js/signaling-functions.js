@@ -168,6 +168,7 @@ function handleOnaddstream (e) {
   console.log('Got remote stream', e.streams);
   var remoteVideo = document.getElementById('remoteVideo');
   remoteVideo.srcObject = e.streams[0];
+  remoteVideo.play();
 }
 
 function onsignalingstatechange (state) {
